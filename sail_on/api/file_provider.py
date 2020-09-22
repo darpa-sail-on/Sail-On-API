@@ -166,6 +166,20 @@ def get_characterization_feedback(
         else 1
         for x in ground_truth.keys()
     }
+
+## TODO: Levensstein -> new type of file
+
+## TODO: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.normalized_mutual_info_score.html
+## x,0,1
+## y,1,0
+## check that gt and results have the same order of identifiers (column 0).
+## then you drop column = 0 and put in a numoy arrya with assumed same row ordering
+## this all
+## numpy array argmax(axis=1)
+## [1,0]
+## MAY NEED START WITH COLUMN 1 instead of 0 (x[1:])
+
+#
 # endregion
 
 
@@ -313,6 +327,10 @@ class FileProvider(Provider):
 
     # Sets up the various feedback algorithms that can be used with
     # this implementation of FileProvider
+    #TODO:
+    # OUR GOAL is to eventually allow this to be configured on start up
+    # FOR NOW, we need to organize this hierarchically  by
+    # DOMAIN, PROTOCOL and finally FEEDBACK_TYPE
     feedback_algorithms = {
         ProtocolConstants.CLASSIFICATION: get_classification_feedback,
         ProtocolConstants.DETECTION: get_detection_feedback,
@@ -352,12 +370,19 @@ class FileProvider(Provider):
             recursive=True,
         )
 
+
+        # TODO: MOVE SESSION INFO FETCH HERE
+        # LOOK UP LAST ROUND SUBMITTED and CURRENT ROUND REQUESTED
+        # VERIFY they match and the last round submitted is the maximum round submitted.
+        # ERROR response if requested round is not the latest last round
+
         if len(results_files) < 1:
             raise ServerError(
                 "result_file_not_found",
                 f"No result file(s) could be found in {self.results_folder}. Make sure results are posted before calling get feedback.",  # noqa: E501
                 traceback.format_stack(),
             )
+
 
         # Get feedback from specified test
         with open(file_locations[0], "r") as f:

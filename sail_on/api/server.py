@@ -299,7 +299,7 @@ def get_feedback() -> Response:
         session_id = data["session_id"]
         test_id = data["test_id"]
         round_id = data.get("round_id")
-        feedback_type = data["feedback_type"]
+        feedback_type = data["feedback_type"]  # TODO: ALLOW TO BE A LIST OR STR
         feedback_ids = data["feedback_ids"].split("|")
         logging.info(
             f"GetFeedback called with session_id: {session_id} test_id: {test_id} round_id: {round_id} feedback_ids: {feedback_ids} feedback_type: {feedback_type}"  # noqa: E501
@@ -312,6 +312,7 @@ def get_feedback() -> Response:
         )
 
     try:
+        # TODO: Collect responses over feedback and sent single/or multi file response
         response = Binder.provider.get_feedback(
             feedback_ids, feedback_type, session_id, test_id, round_id
         )
