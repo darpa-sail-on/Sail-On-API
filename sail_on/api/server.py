@@ -106,17 +106,24 @@ def test_ids_request() -> Response:
     """
 
     try:
-        val = get_from_request(request, "test_requirements", default="{}")
+        val = get_from_request(request, "test_requirements", default=None)
         if val is None:
+            protocol = get_from_request(request, "protocol", default=None)
+            domain = get_from_request(request, "domain", default="image_classification")
+            seed = get_from_request(request, "detector_seed")
+        else:
+            data = json.loads(val)
+            protocol = data["protocol"]
+            domain = data["domain"]
+            seed = data["detector_seed"]
+
+        if protocol is None:
             raise ProtocolError(
                 "MissingRequestValue",
-                "test_requirements missing from request object",
+                "test_requirements or protocol missing from request object",
                 traceback.format_exc(),
             )
-        data = json.loads(val)
-        protocol = data["protocol"]
-        domain = data["domain"]
-        seed = data["detector_seed"]
+
         test_assumptions = get_from_request(request, "test_assumptions", default="{}")
         logging.info(
             f"TestIdsRequest called with protocol: {protocol} domain: {domain} detector_seed: {seed} test_assumptions: {test_assumptions}"  # noqa: E501
@@ -466,6 +473,77 @@ def terminate_session() -> str:
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
+
+@app.route("/session/status", methods=["GET"])
+def session_status() -> str:
+    """
+        Retrieve Session Names
+
+        Arguments:
+            -after date time iso formatted string lower bound
+            -session_id specific session
+            -include_tests provide all tests in session(s)
+        Returns:
+            CSV of session id and start date time and, termination date time stamp in iso format
+          if include tests, then add a second column of tests, thus the format is:
+           session_id, test_id, start date time, termination date time stamp
+    """
+
+    # Attempts to retrieve the proper variables from the API call body,
+    # and passes them to the provider function
+    data = request.args
+    after = data["after"] if 'after' in data else None
+    session_id = data["session_id"] if 'session_id' in data else None
+    include_tests = data["include_tests"] if 'include_tests' in data else False
+    include_tests = include_tests if type(include_tests) == bool else include_tests.lower() == 'true'
+
+    try:
+        return Binder.provider.session_status(after, session_id, include_tests).encode('utf-8')
+    except ServerError as e:
+        raise e
+    except ProtocolError as e:
+        raise e
+    except Exception as e:
+        raise ServerError(str(type(e)), str(e), traceback.format_exc())
+
+@app.route("/session/zip", methods=["GET"])
+def session_zip() -> str:
+    """
+    Produce zip file of test results for session.
+
+    Arguments:
+        -session_id date time stamp in iso format
+    Returns:
+        -zip file of session files
+    """
+
+    # Attempts to retrieve the proper variables from the API call body,
+    # and passes them to the provider function
+    data = request.args
+    try:
+        session_id = data["session_id"]
+        logging.info(f"Zip Session called with session_id: {session_id}")
+    except KeyError:
+        raise ProtocolError(
+            "MissingParamsError",
+            "TerminateSession requires session_id",
+            traceback.format_exc(),
+        )
+
+    try:
+        file_path = Binder.provider.get_session_zip(session_id)
+        return send_file(
+            file_path,
+            attachment_filename=f"{session_id}.zip",
+            as_attachment=True,
+            mimetype="application/zip",
+        )
+    except ServerError as e:
+        raise e
+    except ProtocolError as e:
+        raise e
+    except Exception as e:
+        raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
 def main(args: argparse.Namespace) -> None:
     """Run the main application."""
