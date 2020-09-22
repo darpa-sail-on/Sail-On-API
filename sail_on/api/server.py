@@ -70,8 +70,9 @@ def get_test_metadata() -> Response:
     """
     data = request.args
     try:
+        session_id = data.get("session_id", None)
         test_id = data["test_id"]
-        logging.info(f"Retrieved metadata for Test Id {test_id}")
+        logging.info(f"Retrieved metadata for Session ID {session_id} Test Id {test_id}")
     except KeyError:
         raise ProtocolError(
             "MissingParamsError",
@@ -79,7 +80,7 @@ def get_test_metadata() -> Response:
             traceback.format_exc(),
         )
     try:
-        response = Binder.provider.get_test_metadata(test_id)
+        response = Binder.provider.get_test_metadata(session_id, test_id)
         logging.info(f"Returning metadata: {response}")
         return response
     except ServerError as e:
@@ -200,6 +201,7 @@ def new_session() -> Dict[str, str]:
         data = json.loads(val)
         protocol = data["protocol"]
         novelty_version = data["novelty_detector_version"]
+        hints = data.get("hints", [])
 
         reader = request.files["test_ids"].read().decode("utf-8").split("\n")
         test_ids = [x.strip(" \"',") for x in filter(lambda x: x != "", reader)]
@@ -217,7 +219,7 @@ def new_session() -> Dict[str, str]:
         raise ProtocolError("EmptyFile", "Test Ids file was empty")
 
     try:
-        response = Binder.provider.new_session(test_ids, protocol, novelty_version)
+        response = Binder.provider.new_session(test_ids, protocol, novelty_version, hints)
 
         logging.info(f"Returning session_id: {response}")
         return {"session_id": response}

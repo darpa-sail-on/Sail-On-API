@@ -53,6 +53,7 @@ class Provider(ABC):
              protocol, domain, etc.
             -protocol: Empirical protocol that the client would be evaluated against.
             -novelty_detector_version: Version of the novelty detector being used
+            -hints: list of hints desired during the tests
             Returns:
             -session_id: A unique identifier that the server associated with the client
 
@@ -117,7 +118,7 @@ class Provider(ABC):
 
     @abstractmethod
     def new_session(
-        self, test_ids: List[str], protocol: str, novelty_detector_version: str
+        self, test_ids: List[str], protocol: str, novelty_detector_version: str, hints: List[str]
     ) -> str:
         """Create a new session."""
         pass

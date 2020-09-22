@@ -178,7 +178,7 @@ class FileProvider(Provider):
         self.results_folder = results_folder
         os.makedirs(results_folder, exist_ok=True)
 
-    def get_test_metadata(self, test_id: str, api_call: bool = True) -> Dict[str, Any]:
+    def get_test_metadata(self, session_id: str, test_id: str, api_call: bool = True) -> Dict[str, Any]:
         """Get test metadata"""
         metadata_location = glob.glob(
             os.path.join(self.folder, "**", f"{test_id}_metadata.json"), recursive=True
@@ -191,14 +191,21 @@ class FileProvider(Provider):
                 traceback.format_stack(),
             )
 
+        hints = []
+
         # List of metadata vars approved to be sent to the client
         approved_metadata = [
             "protocol",
             "known_classes",
             "max_novel_classes",
-            "round_size",
-            "red_light"
+            "round_size"
         ]
+
+        if session_id is not None:
+            structure = get_session_info(self.results_folder, session_id)
+            hints = structure.get('activity',{}).get('created', {}).get('hints',[])
+
+        approved_metadata.extend([data for data in ["red_light"] if data in hints])
 
         with open(metadata_location[0], "r") as md:
             if api_call:
@@ -217,7 +224,7 @@ class FileProvider(Provider):
         return {"test_ids": file_location, "generator_seed": "1234"}
 
     def new_session(
-        self, test_ids: List[str], protocol: str, novelty_detector_version: str
+        self, test_ids: List[str], protocol: str, novelty_detector_version: str, hints: List[str]
     ) -> str:
         """Create a session."""
         # Verify's that all given test id's are valid and have associated csv files
@@ -249,6 +256,7 @@ class FileProvider(Provider):
                 "protocol": protocol,
                 "domain": domain,
                 "detector": novelty_detector_version,
+                "hints": hints
             },
         )
 
@@ -266,7 +274,7 @@ class FileProvider(Provider):
                 traceback.format_stack(),
             )
 
-        metadata = self.get_test_metadata(test_id, False)
+        metadata = self.get_test_metadata(session_id, test_id, False)
 
         if round_id is not None:
             temp_file_path = BytesIO()
@@ -333,7 +341,7 @@ class FileProvider(Provider):
                 traceback.format_stack(),
             )
 
-        metadata = self.get_test_metadata(test_id, False)
+        metadata = self.get_test_metadata(session_id, test_id, False)
 
         results_files = glob.glob(
             os.path.join(
