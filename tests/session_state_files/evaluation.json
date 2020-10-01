@@ -2,7 +2,7 @@
   "activity": {
     "created": {
       "time": "2020-04-06 11:03:00.144872",
-      "protocol": "OSND",
+      "protocol": "OND",
       "domain": "image_classification",
       "detector": "0.1.1"
     },
@@ -18,7 +18,7 @@
         }
       }
     },
-    "get_labels": {
+    "get_feedback": {
       "time": "2020-04-06 10:51:13.837036",
       "tests": {
         "OSND.1.1.1234": {

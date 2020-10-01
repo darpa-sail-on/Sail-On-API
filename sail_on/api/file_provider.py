@@ -11,7 +11,11 @@ import uuid
 import datetime
 import json
 import traceback
-
+import nltk
+import numpy as np
+from sklearn.metrics.cluster import normalized_mutual_info_score
+from dateutil import parser
+import zipfile
 
 from typing import List, Optional, Dict, Any
 from csv import reader
@@ -41,21 +45,33 @@ def log_session(
     structure = get_session_info(folder, session_id)
     activities = structure.get("activity", {})
     if test_id is None:
-        activities[activity] = {"time": str(datetime.datetime.now())}
+        activities[activity] = {"time": [str(datetime.datetime.now())]}
         if content is not None:
             activities[activity].update(content)
     else:
         if activity not in activities:
-            activities[activity] = {"time": str(datetime.datetime.now())}
+            activities[activity] = {"time": [str(datetime.datetime.now())]}
         tests = activities[activity].get("tests", {})
         if test_id not in tests:
             tests[test_id] = {}
-        rounds = tests[test_id].get("rounds", {})
-        if round_id not in rounds:
-            rounds[round_id] = {"time": str(datetime.datetime.now())}
-        if content is not None:
-            rounds[round_id].update(content)
-        tests[test_id]["rounds"] = rounds
+        if round_id is None:
+            if "time" in tests[test_id]:
+                tests[test_id]["time"].append(str(datetime.datetime.now()))
+            else:
+                tests[test_id]["time"] = [str(datetime.datetime.now())]
+            if content is not None:
+                tests[test_id].update(content)
+        else:
+            round_id = str(round_id)
+            rounds = tests[test_id].get("rounds", {})
+            if round_id not in rounds:
+                rounds[round_id] = {"time": [str(datetime.datetime.now())]}
+            else:
+                rounds[round_id]["time"].append(str(datetime.datetime.now()))
+            if content is not None:
+                rounds[round_id].update(content)
+            tests[test_id]["rounds"] = rounds
+            tests[test_id]["last round"] = round_id
         activities[activity]["tests"] = tests
     structure["activity"] = activities
     with open(os.path.join(folder, f"{str(session_id)}.json"), "w") as session_file:
@@ -67,53 +83,55 @@ def read_feedback_file(
         csv_reader: reader,
         feedback_ids: List[str],
         metadata: Dict[str, Any],
-        round_id: int,
+        is_ground_truth: bool,
+        round_id: Optional[int] = None,
 ) -> Dict[str, str]:
     """
         Gets the feedback data out of the provided
-        csv feedback file for the specified ids.
+        csv feedback file for the specified ids in 
+        the last submitted round.
     """
-    if round_id is not None:
-        try:
-            round_pos = int(round_id) * int(metadata["round_size"])
-        except KeyError:
-            raise RoundError(
-                "no_defined_rounds",
-                "round_size not defined in metadata.",
-                traceback.format_stack(),
-            )
+
+    try:
         lines = [x for x in csv_reader]
-        if round_pos >= len(lines):
-            raise RoundError(
-                "round_id_invalid",
-                f"Round id {str(round_id)} is out of scope. Check the metadata round_size.",  # noqa: E501
-                traceback.format_stack(),
-            )
+        if is_ground_truth:
+            round_pos = int(round_id) * int(metadata["round_size"])
+        else:
+            round_pos = len(lines) - int(metadata["round_size"])
+    except KeyError:
+        raise RoundError(
+            "no_defined_rounds",
+            "round_size not defined in metadata.",
+            traceback.format_stack(),
+        )
+    if feedback_ids is not None:
         return {
-                    x[0]: [float(n) for n in x[1:]]
-                    for x in [
-                                 [n.strip(" \"'") for n in y] for y in lines
-                             ][round_pos:round_pos + int(metadata["round_size"])]
-                    if x[0] in feedback_ids
-                }
+            x[0]: [float(n) for n in x[1:]]
+            for x in [[n.strip(" \"'") for n in y] for y in lines][round_pos:round_pos + int(metadata["round_size"])]
+            if x[0] in feedback_ids
+        }
     else:
         return {
             x[0]: [float(n) for n in x[1:]]
-            for x in [[n.strip(" \"'") for n in y] for y in csv_reader]
-            if x[0] in feedback_ids
+            for x in [[n.strip(" \"'") for n in y] for y in lines][round_pos:round_pos + int(metadata["round_size"])]
         }
 
 
 def get_classification_feedback(
-        gt_reader: reader,
-        result_reader: reader,
+        gt_files: List[str],
+        result_files: List[str],
         feedback_ids: List[str],
         metadata: Dict[str, Any],
         round_id: int,
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for classification type feedback"""
-    ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, round_id)
-    results = read_feedback_file(result_reader, feedback_ids, metadata, round_id)
+    with open(gt_files[0], "r") as f:
+        gt_reader = csv.reader(f, delimiter=",")
+        ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
+    with open(result_files[0], "r") as rf:
+        result_reader = csv.reader(rf, delimiter=",")
+        results = read_feedback_file(result_reader, feedback_ids, metadata, False)
+
     return {
         x: 0
         if ground_truth[x][1:].index(max(ground_truth[x][1:])) !=
@@ -124,8 +142,8 @@ def get_classification_feedback(
 
 
 def get_detection_feedback(
-        gt_reader: reader,
-        result_reader: reader,
+        gt_files: List[str],
+        result_files: List[str],
         feedback_ids: List[str],
         metadata: Dict[str, Any],
         round_id: int,
@@ -133,8 +151,12 @@ def get_detection_feedback(
     """Calculates and returns the proper feedback for detection type feedback"""
     threshold = float(metadata["threshold"])
 
-    ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, round_id)
-    results = read_feedback_file(result_reader, feedback_ids, metadata, round_id)
+    with open(gt_files[0], "r") as f:
+        gt_reader = csv.reader(f, delimiter=",")
+        ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
+    with open(result_files[0], "r") as rf:
+        result_reader = csv.reader(rf, delimiter=",")
+        results = read_feedback_file(result_reader, feedback_ids, metadata, False)
 
     return {
         x: 0 if abs(ground_truth[x][0] - results[x][0]) > threshold else 1
@@ -143,8 +165,8 @@ def get_detection_feedback(
 
 
 def get_characterization_feedback(
-        gt_reader: reader,
-        result_reader: reader,
+        gt_files: List[str],
+        result_files: List[str],
         feedback_ids: List[str],
         metadata: Dict[str, Any],
         round_id: int,
@@ -152,8 +174,12 @@ def get_characterization_feedback(
     """Calculates and returns the proper feedback for characterization type feedback"""
     known_classes = int(metadata["known_classes"]) + 1
 
-    ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, round_id)
-    results = read_feedback_file(result_reader, feedback_ids, metadata, round_id)
+    with open(gt_files[0], "r") as f:
+        gt_reader = csv.reader(f, delimiter=",")
+        ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
+    with open(result_files[0], "r") as rf:
+        result_reader = csv.reader(rf, delimiter=",")
+        results = read_feedback_file(result_reader, feedback_ids, metadata, False)
 
     # If ground truth is not novel, returns 1 is prediction is correct, 
     # otherwise returns 1 if prediction is not a known class
@@ -167,19 +193,67 @@ def get_characterization_feedback(
         for x in ground_truth.keys()
     }
 
-## TODO: Levensstein -> new type of file
+def get_levenshtein_feedback(
+        gt_files: List[str],
+        result_files: List[str],
+        feedback_ids: List[str],
+        metadata: Dict[str, Any],
+        round_id: int,
+) -> Dict[str, Any]:
+    """Calculates and returns the proper feedback for levenshtein type feedback"""
+    with open(gt_files[0], "r") as f:
+        gt_reader = csv.reader(f, delimiter=",")
+        ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
+    with open(result_files[0], "r") as rf:
+        result_reader = csv.reader(rf, delimiter=",")
+        results = read_feedback_file(result_reader, feedback_ids, metadata, False)
 
-## TODO: https://scikit-learn.org/stable/modules/generated/sklearn.metrics.normalized_mutual_info_score.html
-## x,0,1
-## y,1,0
-## check that gt and results have the same order of identifiers (column 0).
-## then you drop column = 0 and put in a numoy arrya with assumed same row ordering
-## this all
-## numpy array argmax(axis=1)
-## [1,0]
-## MAY NEED START WITH COLUMN 1 instead of 0 (x[1:])
+    return {
+        x: nltk.edit_distance([str(n) for n in ground_truth[x]], [str(n) for n in results[x]])
+        for x in ground_truth.keys()
+    }
 
-#
+
+def get_cluster_feedback(
+        gt_files: List[str],
+        result_files: List[str],
+        feedback_ids: List[str],
+        metadata: Dict[str, Any],
+        round_id: int,
+) -> Dict[str, Any]:
+    """Calculates and returns the proper feedback for levenshtein type feedback"""
+    with open(gt_files[0], "r") as f:
+        gt_reader = csv.reader(f, delimiter=",")
+        ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
+    with open(result_files[0], "r") as rf:
+        result_reader = csv.reader(rf, delimiter=",")
+        results = read_feedback_file(result_reader, feedback_ids, metadata, False)
+
+    if feedback_ids is None:
+        feedback_ids = ground_truth.keys()
+
+    gt_list = []
+    r_list = []
+    try:
+        for key in sorted(feedback_ids):
+            gt_list.append(ground_truth[key])
+            r_list.append(results[key])
+    except:
+        raise ServerError("MissingIds", "Some requested Ids are missing from either ground truth or results file for the current round")
+    
+    gt_np = np.argmax(np.array(gt_list), axis=1)
+    r_np = np.argmax(np.array(gt_list), axis=1)
+
+    return_dict = {
+        "cluster": normalized_mutual_info_score(gt_np, r_np)
+    }
+
+    for i in np.unique(r_np):
+        places = np.where(r_np == i)[0]
+        return_dict[str(i)] = (max(np.unique(gt_np[places],return_counts=True)[1])/places.shape[0])
+    
+    return return_dict
+
 # endregion
 
 
@@ -244,9 +318,9 @@ class FileProvider(Provider):
         # Verify's that all given test id's are valid and have associated csv files
         for test_id in test_ids:
             file_locations = glob.glob(
-                os.path.join(self.folder, "**", f"{test_id}.csv"), recursive=True
+                os.path.join(self.folder, protocol, "**", f"{test_id}.csv"), recursive=True
             )
-            if len(file_locations) != 1:
+            if len(file_locations) == 0:
                 raise ServerError(
                     "test_id_invalid",
                     f"Test Id {test_id} could not be matched to a specific file",
@@ -254,11 +328,6 @@ class FileProvider(Provider):
                 )
 
             domain = (file_locations[0]).split(os.path.sep)[-2]
-            found_protocol = (file_locations[0]).split(os.path.sep)[-3]
-            if found_protocol != protocol:
-                raise ValueError(
-                    f"Test file not associated with given protocol {protocol}"
-                )
 
         session_id = str(uuid.uuid4())
 
@@ -281,7 +350,7 @@ class FileProvider(Provider):
         file_locations = glob.glob(
             os.path.join(self.folder, "**", f"{test_id}.csv"), recursive=True
         )
-        if len(file_locations) != 1:
+        if len(file_locations) == 0:
             raise ServerError(
                 "test_id_invalid",
                 f"Test Id {test_id} could not be matched to a specific file",
@@ -313,7 +382,7 @@ class FileProvider(Provider):
                 temp_file_path.write(''.join(lines[round_pos:round_pos + int(metadata["round_size"])]).encode('utf-8'))
                 temp_file_path.seek(0)
         else:
-            temp_file_path = open(file_locations[0],'rb')
+            temp_file_path = open(file_locations[0], 'rb')
 
         log_session(
             self.results_folder,
@@ -327,14 +396,42 @@ class FileProvider(Provider):
 
     # Sets up the various feedback algorithms that can be used with
     # this implementation of FileProvider
-    #TODO:
-    # OUR GOAL is to eventually allow this to be configured on start up
-    # FOR NOW, we need to organize this hierarchically  by
-    # DOMAIN, PROTOCOL and finally FEEDBACK_TYPE
-    feedback_algorithms = {
-        ProtocolConstants.CLASSIFICATION: get_classification_feedback,
-        ProtocolConstants.DETECTION: get_detection_feedback,
-        ProtocolConstants.CHARACTERIZATION: get_characterization_feedback,
+
+    feedback_request_mapping = {
+        "image_classification" : {
+            ProtocolConstants.CLASSIFICATION:  {
+                "function" : get_classification_feedback,
+                "files" : ['detection', 'classification']
+            }
+        },
+        "transcripts" : {
+            ProtocolConstants.CLASSIFICATION:  {
+                "function" : get_cluster_feedback,
+                "files" : ['classification']
+            },
+            ProtocolConstants.TRANSCRIPTION: {
+                "function": get_levenshtein_feedback,
+                "files": ['transcription']
+            },
+            ProtocolConstants.CHARACTERIZATION: {
+                "function": get_cluster_feedback,
+                "files": ['characterization']
+            }
+        },
+        "activity" : {
+            ProtocolConstants.CLASSIFICATION:  {
+                "function" : get_cluster_feedback,
+                "files" : ['classification']
+            },
+            ProtocolConstants.TEMPORAL: {
+                "function": get_cluster_feedback,
+                "files": ['temporal']
+            },
+            ProtocolConstants.SPATIAL: {
+                "function": get_cluster_feedback,
+                "files": ['spatial']
+            }
+        }
     }
 
     def get_feedback(
@@ -344,37 +441,63 @@ class FileProvider(Provider):
         session_id: str,
         test_id: str,
         round_id: int,
-    ) -> Dict[str, Any]:
+    ) -> BytesIO:
         """Get feedback of the specified type"""
-        # Find label file for specified test
-        file_locations = glob.glob(
-            os.path.join(self.folder, "**", f"{test_id}_{feedback_type}.csv"),
-            recursive=True,
-        )
+        metadata = self.get_test_metadata(session_id, test_id, False)
 
-        if len(file_locations) != 1:
-            raise ServerError(
-                "test_id_invalid",
-                f"Test Id {test_id} could not be matched to a specific ground truth file for feedback type {feedback_type}",  # noqa: E501
+        # Ensure feedback type works with session domain
+        # and if so, grab the proper files
+        domain = metadata["domain"]
+        if domain in self.feedback_request_mapping:
+            try:
+                file_types = self.feedback_request_mapping[domain][feedback_type]["files"]
+            except:
+                raise ProtocolError(
+                    "InvalidFeedbackType", 
+                    f"Invalid feedback type requested for the test id {test_id} with domain {domain}",
+                    traceback.format_stack(),
+                )
+            ground_truth_files = []
+            for t in file_types:
+                ground_truth_files.extend(glob.glob(
+                    os.path.join(self.folder, "**", f"{test_id}_{t}.csv"),
+                    recursive=True,
+                ))
+
+                if len(ground_truth_files) < 1:
+                    raise ServerError(
+                        "test_id_invalid",
+                        f"Could not find ground truth file(s) for test Id {test_id} with feedback type {feedback_type}",  # noqa: E501
+                        traceback.format_stack(),
+                    )
+
+            results_files = []
+            for t in file_types:
+                results_files.extend(glob.glob(
+                    os.path.join(self.results_folder,"**",f"{str(session_id)}.{str(test_id)}_{t}.csv"),
+                    recursive=True,
+                ))
+        else:
+            raise ProtocolError(
+                "BadDomain", 
+                f"The set domain does not match a proper domain type. Please check the metadata file for test {test_id}",
                 traceback.format_stack(),
             )
 
-        metadata = self.get_test_metadata(session_id, test_id, False)
 
-        results_files = glob.glob(
-            os.path.join(
-                self.results_folder,
-                "**",
-                f"{str(session_id)}.{str(test_id)}_{feedback_type}.csv"
-            ),
-            recursive=True,
-        )
-
-
-        # TODO: MOVE SESSION INFO FETCH HERE
-        # LOOK UP LAST ROUND SUBMITTED and CURRENT ROUND REQUESTED
-        # VERIFY they match and the last round submitted is the maximum round submitted.
-        # ERROR response if requested round is not the latest last round
+        # Check to make sure the round id being requested is both the latest and the highest round submitted
+        structure = get_session_info(self.results_folder, session_id)
+        try:
+            if structure["activity"]["post_results"]["tests"][test_id]["last round"] != str(round_id):
+                raise RoundError("NotLastRound", "Attempted to get feedback on an older round. Feedback can only be retrieved on the most recent round submission.")
+            
+            rounds_subbed = [int(r) for r in structure["activity"]["post_results"]["tests"][test_id]["rounds"].keys()]
+            if int(round_id) != max(rounds_subbed):
+                raise RoundError("NotMaxRound", "Attempted to get feedback on a round that wasn't the max round submitted (most likely a resubmitted round).")
+        except RoundError as e:
+            raise e
+        except Exception as e:
+            raise RoundError("SessionLogError", "Error checking session log for round history. Ensure results have been posted before requesting feedback")
 
         if len(results_files) < 1:
             raise ServerError(
@@ -385,59 +508,54 @@ class FileProvider(Provider):
 
 
         # Get feedback from specified test
-        with open(file_locations[0], "r") as f:
-            gt_reader = csv.reader(f, delimiter=",")
-            with open(results_files[0], "r") as rf:
-                result_reader = csv.reader(rf, delimiter=",")
-
-                try:
-                    feedback = self.feedback_algorithms[feedback_type](
-                        gt_reader,
-                        result_reader,
-                        feedback_ids,
-                        metadata,
-                        round_id
-                    )
-                except KeyError:
-                    raise ProtocolError(
-                        "feedback_type_invalid",
-                        f"Feedback type {feedback_type} is not valid. Make sure the provider's feedback_algorithms variable is properly set up",  # noqa: E501
-                        traceback.format_exc()
-                    )
+        try:
+            feedback = self.feedback_request_mapping[domain][feedback_type]["function"](
+                ground_truth_files,
+                results_files,
+                feedback_ids,
+                metadata,
+                round_id
+            )
+        except KeyError:
+            raise ProtocolError(
+                "feedback_type_invalid",
+                f"Feedback type {feedback_type} is not valid. Make sure the provider's feedback_algorithms variable is properly set up",  # noqa: E501
+                traceback.format_exc()
+            )
 
         # Log call
-        count = len(feedback)
         log_session(
             self.results_folder,
             session_id=session_id,
             activity="get_feedback",
             test_id=test_id,
             round_id=round_id,
-            content={feedback_type: feedback_ids},
+            content={"type": feedback_type},
         )
 
         # Update total count
         structure = get_session_info(self.results_folder, session_id)
-        total_count = structure["activity"]["get_feedback"]["tests"][test_id].get(
-            "total count", 0
-        )
-        total_count += count
-        structure["activity"]["get_feedback"]["tests"][test_id][
-            "total count"
-        ] = total_count
+        total_count = structure["activity"]["get_feedback"]["tests"][test_id].get("total count", 0)
+        total_count += 1
+        structure["activity"]["get_feedback"]["tests"][test_id]["total count"] = total_count
         with open(
             os.path.join(self.results_folder, f"{str(session_id)}.json"), "w"
         ) as session_file:
             json.dump(structure, session_file, indent=2)
 
-        temp_csv_path = BytesIO()
+        feedback_csv = BytesIO()
+        if feedback_type == "cluster":
+            feedback_csv.write("cluster".encode('utf-8'))
+            for val in feedback:
+                feedback_csv.write(f",{val}".encode('utf-8'))
+            feedback_csv.write("\n".encode('utf-8'))
+        else:
+            for key in feedback.keys():
+                feedback_csv.write(f"{key},{feedback[key]}\n".encode('utf-8'))
 
-        for key in feedback.keys():
-            temp_csv_path.write(f"{key},{feedback[key]}\n".encode('utf-8'))
+        feedback_csv.seek(0)
 
-        temp_csv_path.seek(0)
-
-        return temp_csv_path
+        return feedback_csv
 
     def post_results(
         self,
@@ -478,8 +596,7 @@ class FileProvider(Provider):
 
     def evaluate(self, session_id: str, test_id: str, round_id: int) -> str:
         """Perform evaluation."""
-        # TODO: FOR NOW, use true/false predictions of novelty to calculate
-        # precision, accuracy, recall and F1 Score
+        # TODO: Get rid of this, evaluate is in separate code base now
         log_session(
             self.results_folder,
             session_id=session_id,
@@ -494,3 +611,69 @@ class FileProvider(Provider):
         """Terminate the session."""
         # Modify session file to indicate session has been terminated
         log_session(self.results_folder, session_id=session_id, activity="termination")
+
+    def session_status(self, after: str = None, session_id: str = None, include_tests: bool = False) -> str:
+        """
+        Retrieve Session Names
+        :param after: Date Time String lower
+        :param include_tests if True, then add the completed test
+        :return: CSV of session id and start date time and, termination date time stamp in iso format
+        if include tests, then add a second column of tests, thus the format is:
+           session_id, test_id, start date time, termination date time stamp
+        """
+        lower_bound = parser.isoparse(after) if after is not None else None
+
+        session_files_locations = glob.glob(
+            os.path.join(os.path.join(self.results_folder, "*.json"))
+        )
+
+        results = []
+        for session_file in session_files_locations:
+            with open(session_file, 'r') as fp:
+                session_data = json.load(fp)
+                terminated = 'activity' in session_data and 'termination' in session_data['activity']
+                created = 'activity' in session_data and 'created' in session_data['activity']
+                if terminated:
+                    terminate_time = session_data['activity']['termination']['time']
+                else:
+                    terminate_time = 'Incomplete'
+                if created:
+                    creation_time = session_data['activity']['created']['time']
+                else:
+                    creation_time = 'N/A'
+                session_name = os.path.splitext(os.path.basename(session_file))[0]
+                test_ids = session_data['activity'].get('post_results', {}).get('tests', {}) \
+                    if include_tests and created else None
+                if (session_id is None and (not lower_bound or
+                                            lower_bound <= parser.isoparse(terminate_time))) or \
+                        session_name == session_id:
+                    if include_tests:
+                        if test_ids:
+                            for test_id in test_ids:
+                                results.append(f'{session_name}, {test_id}, {creation_time},{terminate_time}')
+                        else:
+                            results.append(f'{session_name}, NA, {creation_time}, {terminate_time}')
+                    else:
+                        results.append(f'{session_name},{creation_time},{terminate_time}')
+        results = sorted(results, key=lambda x: (x.split(',')[1], x.split(',')[0]))
+        return '\n'.join(results)
+
+    def get_session_zip(self, session_id) -> str:
+        """
+        Retrieve Completed Session Names
+        :param session_id
+        :return: zip file path
+        """
+        zip_file_name = os.path.join(self.results_folder, f'{session_id}.zip')
+        with zipfile.ZipFile(zip_file_name, 'w', compression= zipfile.ZIP_BZIP2) as zip:
+            zip.write(os.path.join(self.results_folder, f'{session_id}.json'), arcname=f'{session_id}.json')
+
+            for protocol in os.listdir(self.results_folder):
+                if os.path.isdir(os.path.join(self.results_folder, protocol)):
+                    for test_file in glob.glob(
+                            os.path.join(self.results_folder, protocol, "**", f"{session_id}.*.csv"),
+                            recursive=True,
+                    ):
+                        zip.write(test_file, arcname=test_file[len(self.results_folder) + 1:])
+
+        return zip_file_name

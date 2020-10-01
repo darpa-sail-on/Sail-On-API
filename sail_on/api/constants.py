@@ -2,4 +2,9 @@ class ProtocolConstants:
     DETECTION = "detection"
     CLASSIFICATION = "classification"
     CHARACTERIZATION = "characterization"
-    CLASSIFICATION = "classification"
+    TRANSCRIPTION = "transcription"
+    CLUSTER = "cluster"
+    TEMPORAL = "characterization_temporal"
+    SPATIAL = "characterization_spatial"
+    
+    

@@ -10,6 +10,7 @@ from sail_on.api import server, errors, ProtocolConstants
 from sail_on.api.file_provider import FileProvider
 import shutil
 import time
+from requests_toolbelt.multipart import decoder
 
 from typing import Any, Generator, Optional, Dict
 from requests import Response
@@ -50,8 +51,7 @@ def delete(path: str, **params: Dict[str, Any]) -> Response:
     return requests.delete(f"http://localhost:12345{path}", **params)
 
 
-SERVER_RESULTS_DIR = os.path.join(os.path.dirname(__file__), f"server_results_{time.time()}")
-
+SERVER_RESULTS_DIR = os.path.join(os.path.dirname(__file__), f"server_results_unit_tests")
 
 class TestApi(unittest.TestCase):
     """Test the API."""
@@ -64,6 +64,8 @@ class TestApi(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test fixtures."""
+        if os.path.exists(SERVER_RESULTS_DIR):
+            shutil.rmtree(SERVER_RESULTS_DIR)
         os.mkdir(SERVER_RESULTS_DIR)
         server.set_provider(
             FileProvider(os.path.join(os.path.dirname(__file__), "data"), SERVER_RESULTS_DIR)
@@ -155,94 +157,89 @@ class TestApi(unittest.TestCase):
         self.assertEqual(expected, actual)
 
     # Get feedback Tests
-    def test_get_feedback_success_type_detection_OND(self):
+    def test_get_feedback_failure_invalid_type(self):
         """Test get_feedback with type detection."""
         response = get(
             "/session/feedback",
             params={
-                "feedback_ids": "|".join(["n01484850_18013.JPEG", "n01484850_24624.JPEG"]),
+                "feedback_ids": "|".join(["n01484850_4515.JPEG", "n01484850_45289.JPEG"]),
                 "feedback_type": ProtocolConstants.DETECTION,
                 "session_id": "get_feedback",
                 "test_id": "OND.1.1.1234",
+                "round_id": 0
             },
         )
+        try:
+            _check_response(response)
+        except errors.ApiError as e:
+            self.assertEqual('InvalidFeedbackType', e.reason)
 
-        _check_response(response)
-        expected = "n01484850_18013.JPEG,1\nn01484850_24624.JPEG,0\n"
-        actual = response.content.decode("utf-8")
-        self.assertEqual(expected, actual)
-
-    def test_get_feedback_success_type_detection_CONDDA(self):
-        """Test get_feedback with type detection."""
+    def test_get_feedback_success_multiple_types(self):
+        """Test get_feedback with type characterization."""
+        feedback_types = [ProtocolConstants.CLASSIFICATION, ProtocolConstants.CHARACTERIZATION]
         response = get(
             "/session/feedback",
             params={
-                "feedback_ids": "|".join(["n01484850_18013.JPEG", "n01484850_24624.JPEG"]),
-                "feedback_type": ProtocolConstants.DETECTION,
+                "feedback_type": "|".join(feedback_types),
                 "session_id": "get_feedback",
-                "test_id": "CONDDA.1.1.1234",
-                "round_id": 0,
+                "test_id": "OND.1.1.1234",
+                "round_id": 1,
             },
         )
 
         _check_response(response)
-        expected = "n01484850_18013.JPEG,1\nn01484850_24624.JPEG,0\n"
-        actual = response.content.decode("utf-8")
-        self.assertEqual(expected, actual)
+        multipart_data = decoder.MultipartDecoder.from_response(response)
+        result_dicts = []
+        for i in range(len(feedback_types)):
+            header = multipart_data.parts[i].headers[b"Content-Disposition"].decode("utf-8")
+            header_dict = {
+                x[0].strip(): x[1].strip(" \"'")
+                for x in [part.split("=") for part in header.split(";") if "=" in part]
+            }
+            result_dicts.append(header_dict)
 
-    def test_get_feedback_success_type_classification_OND(self):
+        expected = ["cluster,1.0\n0,1.0\n", "cluster,1.0\n0,1.0\n"]
+        actual = []
+        for i, part in enumerate(multipart_data.parts):
+            actual = part.content.decode("utf-8")
+            self.assertEqual(expected[i], actual)
+
+        for i, head in enumerate(result_dicts):
+            self.assertEqual(feedback_types[i], head["name"])
+            self.assertEqual(f"get_feedback.OND.1.1.1234.1_{feedback_types[i]}.csv", head["filename"])
+
+    def test_get_feedback_failure_no_round_id(self):
         """Test get_feedback with type characterization."""
         response = get(
             "/session/feedback",
             params={
                 "feedback_ids": "|".join(
-                    ["n01484850_18013.JPEG", "n01484850_24624.JPEG"]),
+                    ["n01484850_4515.JPEG", "n01484850_45289.JPEG"]),
                 "feedback_type": ProtocolConstants.CLASSIFICATION,
                 "session_id": "get_feedback",
                 "test_id": "OND.1.1.1234",
-                "round_id": 0,
             },
         )
 
-        _check_response(response)
-        expected = "n01484850_18013.JPEG,1\nn01484850_24624.JPEG,0\n"
-        actual = response.content.decode("utf-8")
-        self.assertEqual(expected, actual)
+        try:
+            _check_response(response)
+        except errors.ApiError as e:
+            self.assertEqual('MissingParamsError', e.reason)
 
-    def test_get_feedback_success_type_classification_CONDDA(self):
+    def test_get_feedback_success_cluster(self):
         """Test get_feedback with type characterization."""
         response = get(
             "/session/feedback",
             params={
-                "feedback_ids": "|".join(
-                    ["n01484850_18013.JPEG", "n01484850_24624.JPEG"]),
                 "feedback_type": ProtocolConstants.CLASSIFICATION,
                 "session_id": "get_feedback",
-                "test_id": "CONDDA.1.1.1234",
+                "test_id": "OND.1.1.1234",
+                "round_id": 1,
             },
         )
 
         _check_response(response)
-        expected = "n01484850_18013.JPEG,1\nn01484850_24624.JPEG,0\n"
-        actual = response.content.decode("utf-8")
-        self.assertEqual(expected, actual)
-
-    def test_get_feedback_success_type_characterization_CONDDA(self):
-        """Test get_feedback with type characterization."""
-        response = get(
-            "/session/feedback",
-            params={
-                "feedback_ids": "|".join(
-                    ["n01484850_18013.JPEG", "n01484850_24624.JPEG", "n01484850_4515.JPEG", "n01484850_45289.JPEG"]),
-                "feedback_type": ProtocolConstants.CHARACTERIZATION,
-                "session_id": "get_feedback",
-                "test_id": "CONDDA.1.1.1234",
-                "round_id": 0,
-            },
-        )
-
-        _check_response(response)
-        expected = "n01484850_18013.JPEG,0\nn01484850_24624.JPEG,0\nn01484850_4515.JPEG,0\nn01484850_45289.JPEG,1\n"
+        expected = "cluster,1.0\n0,1.0\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
@@ -262,6 +259,24 @@ class TestApi(unittest.TestCase):
             "result_types": "|".join(result_files.keys())
         }
 
+        files = {"test_identification": io.StringIO(json.dumps(payload))}
+        for r_type in result_files:
+            with open(result_files[r_type], "r") as f:
+                contents = f.read()
+                files[f"{r_type}_file"] = io.StringIO(contents)
+
+        response = post("/session/results", files=files)
+
+        # payload["round_id"] = 1
+        files = {"test_identification": io.StringIO(json.dumps(payload))}
+        for r_type in result_files:
+            with open(result_files[r_type], "r") as f:
+                contents = f.read()
+                files[f"{r_type}_file"] = io.StringIO(contents)
+
+        response = post("/session/results", files=files)
+
+        payload["round_id"] = 1
         files = {"test_identification": io.StringIO(json.dumps(payload))}
         for r_type in result_files:
             with open(result_files[r_type], "r") as f:
@@ -310,6 +325,7 @@ class TestApi(unittest.TestCase):
         payload = {
             "session_id": "post_results",
             "test_id": "OND.1.1.1234",
+            "round_id": 0,
             "result_types": "|".join(result_files.keys())
         }
 
