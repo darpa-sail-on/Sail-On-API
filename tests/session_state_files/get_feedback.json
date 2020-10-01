@@ -14,16 +14,29 @@
         }
       }
     },
-    "get_feedback": {
-      "time": "2020-04-06 10:51:13.837036",
+    "post_results": {
+      "time": [
+        "2020-09-25 11:05:23.986603"
+      ],
       "tests": {
         "OND.1.1.1234": {
           "rounds": {
             "0": {
-              "time": "2020-04-08 13:01:58.819362"
+              "time": [
+                "2020-09-25 11:05:23.986603"
+              ],
+              "detection file path": "c:\\Users\\kaufmana\\Documents\\Sail-On\\Gitlab\\sail-on-api\\tests\\server_results_unit_tests\\OND\\image_classification\\post_results.OND.1.1.1234_detection.csv",
+              "characterization file path": "c:\\Users\\kaufmana\\Documents\\Sail-On\\Gitlab\\sail-on-api\\tests\\server_results_unit_tests\\OND\\image_classification\\post_results.OND.1.1.1234_characterization.csv"
+            },
+            "1": {
+              "time": [
+                "2020-09-25 11:05:23.986603"
+              ],
+              "detection file path": "c:\\Users\\kaufmana\\Documents\\Sail-On\\Gitlab\\sail-on-api\\tests\\server_results_unit_tests\\OND\\image_classification\\post_results.OND.1.1.1234_detection.csv",
+              "characterization file path": "c:\\Users\\kaufmana\\Documents\\Sail-On\\Gitlab\\sail-on-api\\tests\\server_results_unit_tests\\OND\\image_classification\\post_results.OND.1.1.1234_characterization.csv"
             }
           },
-          "total count": 2
+          "last round": "1"
         }
       }
     }

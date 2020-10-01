@@ -1,7 +1,7 @@
 """This file contains a Flask REST API used for communicating between frameworks."""
 
 
-from .errors import ServerError, ProtocolError, ApiError
+from .errors import ServerError, ProtocolError, ApiError, RoundError
 from flask import Flask, request, send_file
 import json
 import os
@@ -11,6 +11,7 @@ import traceback
 import argparse
 from flask import Response, Request
 from .provider import Provider
+from requests_toolbelt import MultipartEncoder
 
 from typing import Union, Tuple, Optional, Dict, Any
 
@@ -284,9 +285,10 @@ def get_feedback() -> Response:
     """
     Gets Feedback of the specified type from the server provided one or more label ids
     Arguments:
+        -session_id
         -test_id
         -round_id
-        -example_ids
+        -feedback_ids
         -feedback_type: detection, characterization, label
     Returns:
         -feedback dictionary
@@ -298,23 +300,29 @@ def get_feedback() -> Response:
     try:
         session_id = data["session_id"]
         test_id = data["test_id"]
-        round_id = data.get("round_id")
-        feedback_type = data["feedback_type"]
-        feedback_ids = data["feedback_ids"].split("|")
+        round_id = data["round_id"]
+        feedback_types = data["feedback_type"].split("|")
+        feedback_ids = data.get("feedback_ids", "")
+        if feedback_ids == "":
+            feedback_ids = None
+        else:
+            feedback_ids = feedback_ids.split("|")
         logging.info(
-            f"GetFeedback called with session_id: {session_id} test_id: {test_id} round_id: {round_id} feedback_ids: {feedback_ids} feedback_type: {feedback_type}"  # noqa: E501
+            f"GetFeedback called with session_id: {session_id} test_id: {test_id} round_id: {round_id} feedback_ids: {feedback_ids} feedback_types: {feedback_types}"  # noqa: E501
         )
     except KeyError:
         raise ProtocolError(
             "MissingParamsError",
-            "GetFeedback requires feedback ids, feedback type, session_id, and test_id",
+            "GetFeedback requires feedback type(s), session_id, test_id, and round id",
             traceback.format_exc(),
         )
 
     try:
-        response = Binder.provider.get_feedback(
-            feedback_ids, feedback_type, session_id, test_id, round_id
-        )
+        responses = {}
+        for f_type in feedback_types:
+            responses[f_type] = Binder.provider.get_feedback(feedback_ids, f_type, session_id, test_id, round_id)
+    except RoundError as e:
+        raise e
     except ServerError as e:
         raise e
     except ProtocolError as e:
@@ -322,10 +330,22 @@ def get_feedback() -> Response:
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
-    # returns the file
+    # returns the file(s)
     try:
-        logging.info(f"Returning feedback at file path: {response}")
-        return send_file(response, attachment_filename=f'{session_id}.{test_id}.{round_id}_{feedback_type}.csv', mimetype="test/csv")
+        logging.info(f"Returning feedback at file path(s): {responses}")
+        if len(feedback_types) > 1:
+            m = MultipartEncoder({
+                key: (
+                    f"{session_id}.{test_id}.{round_id}_{key}.csv",
+                    responses[key],
+                    "text/csv",
+                ) 
+                for key in responses
+            })
+            
+            return Response(m.to_string(), content_type=m.content_type, status=200)
+        else:
+            return send_file(responses[feedback_types[0]], attachment_filename=f'{session_id}.{test_id}.{round_id}_{feedback_types[0]}.csv', mimetype="test/csv")
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
