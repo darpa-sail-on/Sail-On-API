@@ -401,35 +401,35 @@ class FileProvider(Provider):
         "image_classification" : {
             ProtocolConstants.CLASSIFICATION:  {
                 "function" : get_classification_feedback,
-                "files" : ['detection', 'classification']
+                "files" : [ProtocolConstants.DETECTION, ProtocolConstants.CLASSIFICATION]
             }
         },
         "transcripts" : {
             ProtocolConstants.CLASSIFICATION:  {
                 "function" : get_cluster_feedback,
-                "files" : ['classification']
+                "files" : [ProtocolConstants.CLASSIFICATION]
             },
             ProtocolConstants.TRANSCRIPTION: {
                 "function": get_levenshtein_feedback,
-                "files": ['transcription']
+                "files": [ProtocolConstants.TRANSCRIPTION]
             },
             ProtocolConstants.CHARACTERIZATION: {
                 "function": get_cluster_feedback,
-                "files": ['characterization']
+                "files": [ProtocolConstants.CHARACTERIZATION]
             }
         },
         "activity" : {
             ProtocolConstants.CLASSIFICATION:  {
                 "function" : get_cluster_feedback,
-                "files" : ['classification']
+                "files" : [ProtocolConstants.CLASSIFICATION]
             },
             ProtocolConstants.TEMPORAL: {
                 "function": get_cluster_feedback,
-                "files": ['temporal']
+                "files": [ProtocolConstants.TEMPORAL]
             },
             ProtocolConstants.SPATIAL: {
                 "function": get_cluster_feedback,
-                "files": ['spatial']
+                "files": [ProtocolConstants.SPATIAL]
             }
         }
     }

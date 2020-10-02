@@ -4,7 +4,7 @@ class ProtocolConstants:
     CHARACTERIZATION = "characterization"
     TRANSCRIPTION = "transcription"
     CLUSTER = "cluster"
-    TEMPORAL = "characterization_temporal"
-    SPATIAL = "characterization_spatial"
+    TEMPORAL = "temporal"
+    SPATIAL = "spatial"
     
     

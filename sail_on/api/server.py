@@ -289,9 +289,9 @@ def get_feedback() -> Response:
         -test_id
         -round_id
         -feedback_ids
-        -feedback_type: detection, characterization, label
+        -feedback_type: detection, characterization
     Returns:
-        -feedback dictionary
+        -feedback csv file(s)
     """
 
     # Attempts to retrieve the proper variables from the API call body,
@@ -374,7 +374,7 @@ def post_results() -> str:
         data = json.loads(val)
         session_id = data["session_id"]
         test_id = data["test_id"]
-        round_id = data.get("round_id")
+        round_id = data["round_id"]
         result_types = data["result_types"].split("|")
         result_files = {}
         for r_type in result_types:
@@ -412,6 +412,87 @@ def post_results() -> str:
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
+@app.route("/session/resultsfeedback", methods=["POST"])
+def post_results_get_feedback() -> Response:
+    """
+    Post client detector predictions for the dataset.
+    Return feedback on the submitted data
+
+    Arguments:
+        -session_id
+        -test_id
+        -round_id
+        -result_types
+        -result_files
+        -feedback_types
+    Returns:
+        -feedback for the provided result files
+    """
+    # Attempts to retrieve the proper variables from the API call body,
+    # and passes them to the provider function
+    try:
+        val = get_from_request(request, "test_identification", default="{}")
+        if val is None:
+            raise KeyError
+        data = json.loads(val)
+        session_id = data["session_id"]
+        test_id = data["test_id"]
+        round_id = data["round_id"]
+        result_types = data["result_types"].split("|")
+        result_files = {}
+        for r_type in result_types:
+            result_files[r_type] = get_from_request(
+                request, f"{r_type}_file", default=None
+            )
+            if result_files[r_type] is None:
+                raise KeyError
+
+        if len(result_files) == 0:
+            raise KeyError
+
+        logging.info(
+            f"PostResults called with session_id: {session_id} test_id: {test_id} round_id: {round_id} result file types: {result_types}"  # noqa: E501
+        )
+    except KeyError:
+        raise ProtocolError(
+            "MissingParamsError",
+            "PostResults requires session_id, test_id, round_id, and at least one result file with a matching result_type",  # noqa: E501
+            traceback.format_exc(),
+        )
+
+    try:
+        # Carries the call through to the provider and returns 'OK' if successful
+        Binder.provider.post_results(session_id, test_id, round_id, result_files)
+        logging.info("Post Results was successful. Retrieving feedback")
+
+        responses = {}
+        for f_type in result_types:
+            responses[f_type] = Binder.provider.get_feedback([], f_type, session_id, test_id, round_id)
+    except ServerError as e:
+        raise e
+    except ProtocolError as e:
+        raise e
+    except Exception as e:
+        raise ServerError(str(type(e)), str(e), traceback.format_exc())
+
+    # returns the file(s)
+    try:
+        logging.info(f"Returning feedback at file path(s): {responses}")
+        if len(result_types) > 1:
+            m = MultipartEncoder({
+                key: (
+                    f"{session_id}.{test_id}.{round_id}_{key}.csv",
+                    responses[key],
+                    "text/csv",
+                ) 
+                for key in responses
+            })
+            
+            return Response(m.to_string(), content_type=m.content_type, status=200)
+        else:
+            return send_file(responses[result_types[0]], attachment_filename=f'{session_id}.{test_id}.{round_id}_{result_types[0]}.csv', mimetype="test/csv")
+    except Exception as e:
+        raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
 @app.route("/session/evaluations", methods=["GET"])
 def evaluate() -> Response:

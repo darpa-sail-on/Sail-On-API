@@ -287,7 +287,7 @@ class TestApi(unittest.TestCase):
 
         _check_response(response)
 
-    def test_post_results_success_without_round_id(self):
+    def test_post_results_failure_without_round_id(self):
         """Test posting results without rounds."""
         result_files = {
             ProtocolConstants.DETECTION: os.path.join(
@@ -309,7 +309,10 @@ class TestApi(unittest.TestCase):
 
         response = post("/session/results", files=files)
 
-        _check_response(response)
+        try:
+            _check_response(response)
+        except errors.ApiError as e:
+            self.assertEqual('MissingParamsError', e.reason)
 
     def test_post_results_success_with_two_files(self):
         """Test posting results with two files."""
