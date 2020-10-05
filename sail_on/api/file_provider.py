@@ -309,6 +309,18 @@ class FileProvider(Provider):
     ) -> Dict[str, str]:
         """Request test IDs."""
         file_location = os.path.join(self.folder, protocol, domain, "test_ids.csv")
+        if not os.path.exists(file_location):
+            msg = f"test_ids.csv file not configured for {protocol} and {domain}"
+            if not os.path.exists(os.path.join(self.folder, protocol)):
+                msg = f"{protocol} not configured"
+            elif not os.path.exists(os.path.join(self.folder, protocol, domain)):
+                msg = f"domain {domain} for {protocol} not configured"
+            raise ProtocolError(
+                "BadDomain",
+                msg,
+                traceback.format_stack(),
+            )
+
         return {"test_ids": file_location, "generator_seed": "1234"}
 
     def new_session(
