@@ -21,8 +21,8 @@ setup_requirements = [
 test_requirements = ["pytest"]
 
 setup(
-    author="Kitware, Inc.",
-    author_email="kitware@kitware.com",
+    author="PAR Government and Kitware, Inc.",
+    author_email="adam_kaufman@partech.com",
     python_requires=">=3.6",
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",

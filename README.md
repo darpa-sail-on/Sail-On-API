@@ -33,15 +33,15 @@ and evaluation services
 The FileProvider assumes tests for protocols have been pre-constructed. This includes:
 * List of Tests per Protocol and Domain
 * Contents of Tests per Protocol and Domain
-* Ground Truth for Tests per Protocol and Domain (i.e. Labels)
+* Ground Truth for Tests per Protocol and Domain 
 
 The FileProvider is given two directories: a location for the test data and location to store test results.
 The file structure for test data is:
 + PROTOCOL LEVEL -> each folder is named after the PROTOCOL (e.g. OSND)
 + + DOMIN LEVEL -> each folder is named after a domain (e.g. images)
 + + + test_ids.csv -> a file summarizing all TEST ID files in the same folder
-+ + + TEST DATA FILE: <PROTOCOL>.<TEST>.<NO>.<SEED>.csv files contain the list of images by URI or filename
-+ + + TEST LABEL FILE:<PROTOCOL>.<TEST>.<NO>.<SEED>_labels.csv files contain the list of images by URI or filename along the label
++ + + TEST DATA FILE: <PROTOCOL>.<TEST>.<NO>.<SEED>.csv files contain the list of examples by URI or filename
++ + + TEST LABEL FILE:<PROTOCOL>.<TEST>.<NO>.<SEED>_<GTTYPE>.csv files contain the list of examples by URI or filename along the ground truth labels for the specific type of ground truth.  There may be more than one type (e.g. classification, characterization).
 
 
 ## KEY COMPONENTS
@@ -50,7 +50,7 @@ The file structure for test data is:
 * TEST is a name or number used to group files all designed to for one test to attain statistical signifiance.
 * NO is the incremental test set number.
 * URI or filename assumes that information is reachable by the client (system under test)
-* Label CSV files have two mandatory columns: the image file URI or filename (as matched to the test data file).  All other columns are reserved for scoring.
+* GT CSV files have two mandatory columns: the image file URI or filename (as matched to the test data file).  All other columns are reserved for scoring.
 These never shared with the client via the protocol.
 
 
