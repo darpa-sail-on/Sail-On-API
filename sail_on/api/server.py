@@ -59,6 +59,8 @@ def get_from_request(
         return req.files[item].read().decode("utf-8")
     elif item in req.args:
         return req.args[item]
+    elif item in req.json:
+        return req.json[item]
     return default
 
 
@@ -204,13 +206,16 @@ def new_session() -> Dict[str, str]:
                 "configuration missing from request object",
                 traceback.format_exc(),
             )
-        data = json.loads(val)
+        data = json.loads(val) if type(val) is not dict else val
         protocol = data["protocol"]
         novelty_version = data["novelty_detector_version"]
         hints = data.get("hints", [])
 
-        reader = request.files["test_ids"].read().decode("utf-8").split("\n")
-        test_ids = [x.strip(" \"',") for x in filter(lambda x: x != "", reader)]
+        if "test_ids" in data:
+            test_ids = data['test_ids']
+        else:
+            reader = request.files["test_ids"].read().decode("utf-8").split("\n")
+            test_ids = [x.strip(" \"',") for x in filter(lambda x: x != "", reader)]
         logging.info(
             f"NewSession called with test_ids: {test_ids} protocol: {protocol} novelty_detector_version: {novelty_version}"  # noqa: E501
         )
@@ -222,7 +227,7 @@ def new_session() -> Dict[str, str]:
         )
 
     if len(test_ids) == 0:
-        raise ProtocolError("EmptyFile", "Test Ids file was empty")
+        raise ProtocolError("EmptyFile", "Select Test Ids is missing")
 
     try:
         response = Binder.provider.new_session(test_ids, protocol, novelty_version, hints)
