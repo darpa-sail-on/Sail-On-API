@@ -162,6 +162,9 @@ def test_ids_request() -> Response:
 
         # Generates the file to be returned
         try:
+            if type(response['test_ids']) == list:
+                return Response('\n'.join(response['test_ids']), content_type="text/csv", status=200)
+
             logging.info(f'Returning test_ids at file path: {response["test_ids"]}')
             return send_file(
                 response["test_ids"],

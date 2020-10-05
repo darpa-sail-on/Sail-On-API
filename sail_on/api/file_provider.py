@@ -307,14 +307,18 @@ class FileProvider(Provider):
     def test_ids_request(
         self, protocol: str, domain: str, detector_seed: str, test_assumptions: str
     ) -> Dict[str, str]:
+        def _strip_id(filename):
+            return os.path.splitext(os.path.basename(filename))[0]
         """Request test IDs."""
         file_location = os.path.join(self.folder, protocol, domain, "test_ids.csv")
         if not os.path.exists(file_location):
-            msg = f"test_ids.csv file not configured for {protocol} and {domain}"
             if not os.path.exists(os.path.join(self.folder, protocol)):
                 msg = f"{protocol} not configured"
             elif not os.path.exists(os.path.join(self.folder, protocol, domain)):
                 msg = f"domain {domain} for {protocol} not configured"
+            else:
+                test_ids = [_strip_id(f) for f in glob.glob(os.path.join(self.folder, protocol, domain,'*.csv'))]
+                return {"test_ids": test_ids, "generator_seed": "1234"}
             raise ProtocolError(
                 "BadDomain",
                 msg,
