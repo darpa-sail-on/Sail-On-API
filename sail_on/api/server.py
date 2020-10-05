@@ -57,6 +57,8 @@ def get_from_request(
         return req.form[item]
     elif item in req.files:
         return req.files[item].read().decode("utf-8")
+    elif item in req.args:
+        return req.args[item]
     return default
 
 
@@ -112,7 +114,7 @@ def test_ids_request() -> Response:
         if val is None:
             protocol = get_from_request(request, "protocol", default=None)
             domain = get_from_request(request, "domain", default="image_classification")
-            seed = get_from_request(request, "detector_seed")
+            seed = get_from_request(request, "detector_seed", 0)
         else:
             data = json.loads(val)
             protocol = data["protocol"]
