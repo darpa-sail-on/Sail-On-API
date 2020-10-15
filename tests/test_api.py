@@ -198,7 +198,7 @@ class TestApi(unittest.TestCase):
             }
             result_dicts.append(header_dict)
 
-        expected = ["cluster,1.0\n0,1.0\n2,1.0\n", "cluster,1.0\n0,1.0\n"]
+        expected = ["nmi,1.0\n0,1.0\n2,1.0\n", "nmi,1.0\n0,1.0\n"]
         actual = []
         for i, part in enumerate(multipart_data.parts):
             actual = part.content.decode("utf-8")
@@ -239,7 +239,7 @@ class TestApi(unittest.TestCase):
         )
 
         _check_response(response)
-        expected = "cluster,1.0\n0,1.0\n2,1.0\n"
+        expected = "nmi,1.0\n0,1.0\n2,1.0\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
