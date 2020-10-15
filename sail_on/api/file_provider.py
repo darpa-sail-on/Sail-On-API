@@ -472,17 +472,20 @@ class FileProvider(Provider):
         "image_classification" : {
             ProtocolConstants.CLASSIFICATION:  {
                 "function" : get_classification_feedback,
-                "files" : [ProtocolConstants.DETECTION, ProtocolConstants.CLASSIFICATION]
+                "files" : [ProtocolConstants.DETECTION, ProtocolConstants.CLASSIFICATION],
+                "detection_req": True
             },
             ProtocolConstants.PSUEDO_CLASSIFICATION: {
                 "function" : psuedo_label_feedback,
-                "files" : [ProtocolConstants.CLASSIFICATION]
+                "files" : [ProtocolConstants.CLASSIFICATION],
+                "detection_req": True
             }
         },
         "transcripts" : {
             ProtocolConstants.CLASSIFICATION:  {
                 "function" : get_cluster_feedback,
-                "files" : [ProtocolConstants.CLASSIFICATION]
+                "files" : [ProtocolConstants.CLASSIFICATION],
+                "detection_req": True
             },
             ProtocolConstants.TRANSCRIPTION: {
                 "function": get_levenshtein_feedback,
@@ -500,7 +503,8 @@ class FileProvider(Provider):
         "activity" : {
             ProtocolConstants.CLASSIFICATION:  {
                 "function" : get_cluster_feedback,
-                "files" : [ProtocolConstants.CLASSIFICATION]
+                "files" : [ProtocolConstants.CLASSIFICATION],
+                "detection_req": True
             },
             ProtocolConstants.TEMPORAL: {
                 "function": get_cluster_feedback,
@@ -536,8 +540,7 @@ class FileProvider(Provider):
             if feedback_count >= metadata["feedback_max_ids"]:
                 raise ProtocolError(
                     "FeedbackBudgetExceeded", 
-                    f"Feedback of type {feedback_type} has already been requested on the maximum number of ids",
-                    traceback.format_exc()
+                    f"Feedback of type {feedback_type} has already been requested on the maximum number of ids"
                 )
         except KeyError:
             feedback_count = 0
@@ -587,7 +590,6 @@ class FileProvider(Provider):
                 traceback.format_stack(),
             )
 
-
         # Check to make sure the round id being requested is both the latest and the highest round submitted
         try:
             if structure["activity"]["post_results"]["tests"][test_id]["last round"] != str(round_id):
@@ -600,6 +602,14 @@ class FileProvider(Provider):
             raise e
         except Exception as e:
             raise RoundError("SessionLogError", "Error checking session log for round history. Ensure results have been posted before requesting feedback")
+
+        # If detection is required, ensure detection has been posted for the requested round
+        if self.feedback_request_mapping[metadata["domain"]][feedback_type].get("detection_req", False):
+            if "detection file path" not in structure["activity"]["post_results"]["tests"][test_id]["rounds"][round_id]:
+                raise ProtocolError(
+                    "DetectionPostRequired", 
+                    "A detection file is required to be posted before feedback can be requested on a round. Please submit Detection results before requesting feedback"
+                )
         
         if len(results_files) < 1:
             raise ServerError(
