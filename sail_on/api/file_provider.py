@@ -254,7 +254,7 @@ def get_cluster_feedback(
     r_np = np.argmax(np.array(gt_list), axis=1)
 
     return_dict = {
-        "cluster": normalized_mutual_info_score(gt_np, r_np)
+        "nmi": normalized_mutual_info_score(gt_np, r_np)
     }
 
     for i in np.unique(r_np):
@@ -662,17 +662,11 @@ class FileProvider(Provider):
         )
 
         feedback_csv = BytesIO()
-        if feedback_type == "cluster":
-            feedback_csv.write("cluster".encode('utf-8'))
-            for val in feedback:
-                feedback_csv.write(f",{val}".encode('utf-8'))
-            feedback_csv.write("\n".encode('utf-8'))
-        else:
-            for key in feedback.keys():
-                if type(feedback[key]) is not list:
-                    feedback_csv.write(f"{key},{feedback[key]}\n".encode('utf-8'))
-                else:
-                    feedback_csv.write(f"{key},{','.join(str(x) for x in feedback[key])}\n".encode('utf-8'))
+        for key in feedback.keys():
+            if type(feedback[key]) is not list:
+                feedback_csv.write(f"{key},{feedback[key]}\n".encode('utf-8'))
+            else:
+                feedback_csv.write(f"{key},{','.join(str(x) for x in feedback[key])}\n".encode('utf-8'))
 
         feedback_csv.seek(0)
 
