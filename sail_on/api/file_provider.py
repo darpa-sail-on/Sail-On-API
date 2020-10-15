@@ -77,7 +77,6 @@ def log_session(
     with open(os.path.join(folder, f"{str(session_id)}.json"), "w") as session_file:
         json.dump(structure, session_file, indent=2)
 
-
 # region Feedback related functions
 def read_feedback_file(
         csv_reader: reader,
@@ -104,18 +103,30 @@ def read_feedback_file(
             "round_size not defined in metadata.",
             traceback.format_stack(),
         )
-    if feedback_ids is not None:
-        return {
-            x[0]: [float(n) for n in x[1:]]
-            for x in [[n.strip(" \"'") for n in y] for y in lines][round_pos:round_pos + int(metadata["round_size"])]
-            if x[0] in feedback_ids
-        }
-    else:
-        return {
-            x[0]: [float(n) for n in x[1:]]
-            for x in [[n.strip(" \"'") for n in y] for y in lines][round_pos:round_pos + int(metadata["round_size"])]
-        }
-
+    try:
+        if feedback_ids is not None:
+            return {
+                x[0]: [float(n) for n in x[1:]]
+                for x in [[n.strip(" \"'") for n in y] for y in lines][round_pos:round_pos + int(metadata["round_size"])]
+                if x[0] in feedback_ids
+            }
+        else:
+            return {
+                x[0]: [float(n) for n in x[1:]]
+                for x in [[n.strip(" \"'") for n in y] for y in lines][round_pos:round_pos + int(metadata["feedback_max_ids"])]
+            }
+    except ValueError:
+        if feedback_ids is not None:
+            return {
+                x[0]: [n for n in x[1:]]
+                for x in [[n.strip(" \"'") for n in y] for y in lines][round_pos:round_pos + int(metadata["round_size"])]
+                if x[0] in feedback_ids
+            }
+        else:
+            return {
+                x[0]: [n for n in x[1:]]
+                for x in [[n.strip(" \"'") for n in y] for y in lines][round_pos:round_pos + int(metadata["feedback_max_ids"])]
+            }
 
 def get_classification_feedback(
         gt_files: List[str],
@@ -163,7 +174,6 @@ def get_detection_feedback(
         for x in ground_truth.keys()
     }
 
-
 def get_characterization_feedback(
         gt_files: List[str],
         result_files: List[str],
@@ -209,10 +219,9 @@ def get_levenshtein_feedback(
         results = read_feedback_file(result_reader, feedback_ids, metadata, False)
 
     return {
-        x: nltk.edit_distance([str(n) for n in ground_truth[x]], [str(n) for n in results[x]])
+        x: [nltk.edit_distance(ground_truth[x][i], results[x][i]) for i,_ in enumerate(ground_truth[x])]
         for x in ground_truth.keys()
     }
-
 
 def get_cluster_feedback(
         gt_files: List[str],
@@ -252,6 +261,45 @@ def get_cluster_feedback(
         places = np.where(r_np == i)[0]
         return_dict[str(i)] = (max(np.unique(gt_np[places],return_counts=True)[1])/places.shape[0])
     
+    return return_dict
+
+def psuedo_label_feedback(
+        gt_files: List[str],
+        feedback_ids: List[str],
+        feedback_type: str,
+        metadata: Dict[str, Any],
+        folder: str,
+        session_id: str,
+        round_id: int,
+) -> Dict[str, Any]:
+    "Grabs psuedo label feedback for requested ids"
+    with open(gt_files[0], "r") as f:
+        gt_reader = csv.reader(f, delimiter=",")
+        ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
+
+    structure = get_session_info(folder, session_id)
+
+    if "psuedo_labels" in structure["activity"]:
+        if feedback_type in structure["activity"]["psuedo_labels"]:
+            labels = structure["activity"]["psuedo_labels"][feedback_type]
+        else:
+            structure["activity"]["psuedo_labels"][feedback_type] = []
+            labels = []
+    else:
+        structure["activity"]["psuedo_labels"] = {feedback_type: []}
+        labels = []
+
+    return_dict = {}
+    for x in ground_truth.keys():
+        col = ground_truth[x].index(max(ground_truth[x]))
+        if col not in labels:
+            labels.append(col)
+        return_dict[x] = labels.index(col)
+
+    structure["activity"]["psuedo_labels"][feedback_type] = labels
+    with open(os.path.join(folder, f"{str(session_id)}.json"), "w") as session_file:
+        json.dump(structure, session_file, indent=2)
+
     return return_dict
 
 # endregion
@@ -412,12 +460,23 @@ class FileProvider(Provider):
 
     # Sets up the various feedback algorithms that can be used with
     # this implementation of FileProvider
-
+    # {
+    #   domain: {
+    #       feedback_type: {
+    #           function: ...
+    #           files: [...]
+    #       }
+    #   }
+    # }
     feedback_request_mapping = {
         "image_classification" : {
             ProtocolConstants.CLASSIFICATION:  {
                 "function" : get_classification_feedback,
                 "files" : [ProtocolConstants.DETECTION, ProtocolConstants.CLASSIFICATION]
+            },
+            ProtocolConstants.PSUEDO_CLASSIFICATION: {
+                "function" : psuedo_label_feedback,
+                "files" : [ProtocolConstants.CLASSIFICATION]
             }
         },
         "transcripts" : {
@@ -432,6 +491,10 @@ class FileProvider(Provider):
             ProtocolConstants.CHARACTERIZATION: {
                 "function": get_cluster_feedback,
                 "files": [ProtocolConstants.CHARACTERIZATION]
+            },
+            ProtocolConstants.PSUEDO_CLASSIFICATION: {
+                "function" : psuedo_label_feedback,
+                "files" : [ProtocolConstants.CLASSIFICATION]
             }
         },
         "activity" : {
@@ -446,6 +509,10 @@ class FileProvider(Provider):
             ProtocolConstants.SPATIAL: {
                 "function": get_cluster_feedback,
                 "files": [ProtocolConstants.SPATIAL]
+            },
+            ProtocolConstants.PSUEDO_CLASSIFICATION: {
+                "function" : psuedo_label_feedback,
+                "files" : [ProtocolConstants.CLASSIFICATION]
             }
         }
     }
@@ -460,6 +527,26 @@ class FileProvider(Provider):
     ) -> BytesIO:
         """Get feedback of the specified type"""
         metadata = self.get_test_metadata(session_id, test_id, False)
+        structure = get_session_info(self.results_folder, session_id)
+
+        # Gets the amount of ids already requested for this type of feedback this round and 
+        # determines whether the limit has alreayd been reached
+        try:
+            feedback_count = structure["activity"]["get_feedback"]["tests"][test_id]["rounds"][round_id].get(feedback_type, 0)
+            if feedback_count >= metadata["feedback_max_ids"]:
+                raise ProtocolError(
+                    "FeedbackBudgetExceeded", 
+                    f"Feedback of type {feedback_type} has already been requested on the maximum number of ids",
+                    traceback.format_exc()
+                )
+        except KeyError:
+            feedback_count = 0
+
+        # Makes sure that feedback isnt gathered on more than the allowed number of ids per round
+        metadata["feedback_max_ids"] -= feedback_count
+        if "feedback_max_ids" in metadata and feedback_ids is not None:
+            if len(feedback_ids) > metadata["feedback_max_ids"]:
+                feedback_ids = feedback_ids[0:metadata["feedback_max_ids"]]
 
         # Ensure feedback type works with session domain
         # and if so, grab the proper files
@@ -502,7 +589,6 @@ class FileProvider(Provider):
 
 
         # Check to make sure the round id being requested is both the latest and the highest round submitted
-        structure = get_session_info(self.results_folder, session_id)
         try:
             if structure["activity"]["post_results"]["tests"][test_id]["last round"] != str(round_id):
                 raise RoundError("NotLastRound", "Attempted to get feedback on an older round. Feedback can only be retrieved on the most recent round submission.")
@@ -514,7 +600,7 @@ class FileProvider(Provider):
             raise e
         except Exception as e:
             raise RoundError("SessionLogError", "Error checking session log for round history. Ensure results have been posted before requesting feedback")
-
+        
         if len(results_files) < 1:
             raise ServerError(
                 "result_file_not_found",
@@ -525,13 +611,24 @@ class FileProvider(Provider):
 
         # Get feedback from specified test
         try:
-            feedback = self.feedback_request_mapping[domain][feedback_type]["function"](
-                ground_truth_files,
-                results_files,
-                feedback_ids,
-                metadata,
-                round_id
-            )
+            if "psuedo" in feedback_type:
+                feedback = psuedo_label_feedback(
+                    ground_truth_files,
+                    feedback_ids,
+                    self.feedback_request_mapping[domain][feedback_type]["files"][0],
+                    metadata,
+                    self.results_folder,
+                    session_id,
+                    round_id
+                )
+            else:
+                feedback = self.feedback_request_mapping[domain][feedback_type]["function"](
+                    ground_truth_files,
+                    results_files,
+                    feedback_ids,
+                    metadata,
+                    round_id
+                )
         except KeyError:
             raise ProtocolError(
                 "feedback_type_invalid",
@@ -540,24 +637,19 @@ class FileProvider(Provider):
             )
 
         # Log call
+        if feedback_ids is None:
+            feedback_count += metadata["feedback_max_ids"]
+        else:
+            feedback_count += len(feedback_ids)
+
         log_session(
             self.results_folder,
             session_id=session_id,
             activity="get_feedback",
             test_id=test_id,
             round_id=round_id,
-            content={"type": feedback_type},
+            content={feedback_type: feedback_count},
         )
-
-        # Update total count
-        structure = get_session_info(self.results_folder, session_id)
-        total_count = structure["activity"]["get_feedback"]["tests"][test_id].get("total count", 0)
-        total_count += 1
-        structure["activity"]["get_feedback"]["tests"][test_id]["total count"] = total_count
-        with open(
-            os.path.join(self.results_folder, f"{str(session_id)}.json"), "w"
-        ) as session_file:
-            json.dump(structure, session_file, indent=2)
 
         feedback_csv = BytesIO()
         if feedback_type == "cluster":
@@ -567,7 +659,10 @@ class FileProvider(Provider):
             feedback_csv.write("\n".encode('utf-8'))
         else:
             for key in feedback.keys():
-                feedback_csv.write(f"{key},{feedback[key]}\n".encode('utf-8'))
+                if type(feedback[key]) is not list:
+                    feedback_csv.write(f"{key},{feedback[key]}\n".encode('utf-8'))
+                else:
+                    feedback_csv.write(f"{key},{','.join(str(x) for x in feedback[key])}\n".encode('utf-8'))
 
         feedback_csv.seek(0)
 

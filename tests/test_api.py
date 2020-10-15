@@ -158,7 +158,7 @@ class TestApi(unittest.TestCase):
 
     # Get feedback Tests
     def test_get_feedback_failure_invalid_type(self):
-        """Test get_feedback with type detection."""
+        """Test get_feedback with invalid type for domain."""
         response = get(
             "/session/feedback",
             params={
@@ -175,7 +175,7 @@ class TestApi(unittest.TestCase):
             self.assertEqual('InvalidFeedbackType', e.reason)
 
     def test_get_feedback_success_multiple_types(self):
-        """Test get_feedback with type characterization."""
+        """Test get_feedback with multiple types."""
         feedback_types = [ProtocolConstants.CLASSIFICATION, ProtocolConstants.CHARACTERIZATION]
         response = get(
             "/session/feedback",
@@ -198,7 +198,7 @@ class TestApi(unittest.TestCase):
             }
             result_dicts.append(header_dict)
 
-        expected = ["cluster,1.0\n0,1.0\n", "cluster,1.0\n0,1.0\n"]
+        expected = ["cluster,1.0\n0,1.0\n2,1.0\n", "cluster,1.0\n0,1.0\n"]
         actual = []
         for i, part in enumerate(multipart_data.parts):
             actual = part.content.decode("utf-8")
@@ -209,7 +209,7 @@ class TestApi(unittest.TestCase):
             self.assertEqual(f"get_feedback.OND.1.1.1234.1_{feedback_types[i]}.csv", head["filename"])
 
     def test_get_feedback_failure_no_round_id(self):
-        """Test get_feedback with type characterization."""
+        """Test get_feedback fails with no round id."""
         response = get(
             "/session/feedback",
             params={
@@ -227,7 +227,7 @@ class TestApi(unittest.TestCase):
             self.assertEqual('MissingParamsError', e.reason)
 
     def test_get_feedback_success_cluster(self):
-        """Test get_feedback with type characterization."""
+        """Test get_feedback with type classification for cluster function."""
         response = get(
             "/session/feedback",
             params={
@@ -239,7 +239,62 @@ class TestApi(unittest.TestCase):
         )
 
         _check_response(response)
-        expected = "cluster,1.0\n0,1.0\n"
+        expected = "cluster,1.0\n0,1.0\n2,1.0\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
+    def test_get_feedback_transcription(self):
+        """Test get_feedback with type transcription for levenshtien function."""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": ProtocolConstants.TRANSCRIPTION,
+                "session_id": "get_feedback",
+                "test_id": "OND.1.1.1234",
+                "round_id": 1,
+            },
+        )
+
+        _check_response(response)
+        expected = "n01484850_4515.JPEG,3,0\nn01484850_45289.JPEG,0,0\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
+    def test_get_feedback_only_max_ids(self):
+        """Test get_feedback to only grab up to max ids. (Should not attempt to do anything with extra id)"""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_ids": "|".join(
+                    ["n01484850_4515.JPEG", "n01484850_45289.JPEG", "404_id.JPEG"]),
+                "feedback_type": ProtocolConstants.TRANSCRIPTION,
+                "session_id": "get_feedback",
+                "test_id": "OND.1.1.1234",
+                "round_id": 1,
+            },
+        )
+
+        _check_response(response)
+        expected = "n01484850_4515.JPEG,3,0\nn01484850_45289.JPEG,0,0\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
+    def test_get_feedback_psuedo_classification(self):
+        """Test getting psuedo labels for given ids"""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_ids": "|".join(
+                    ["n01484850_4515.JPEG", "n01484850_45289.JPEG"]),
+                "feedback_type": ProtocolConstants.PSUEDO_CLASSIFICATION,
+                "session_id": "get_feedback",
+                "test_id": "OND.1.1.1234",
+                "round_id": 1,
+            },
+        )
+
+        _check_response(response)
+        expected = "n01484850_4515.JPEG,2\nn01484850_45289.JPEG,1\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 

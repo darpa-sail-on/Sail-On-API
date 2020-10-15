@@ -6,5 +6,5 @@ class ProtocolConstants:
     CLUSTER = "cluster"
     TEMPORAL = "temporal"
     SPATIAL = "spatial"
-    
+    PSUEDO_CLASSIFICATION = "psuedo_labels_classification"
     
