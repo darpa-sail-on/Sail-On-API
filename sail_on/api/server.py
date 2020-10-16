@@ -59,7 +59,7 @@ def get_from_request(
         return req.files[item].read().decode("utf-8")
     elif item in req.args:
         return req.args[item]
-    elif item in req.json:
+    elif req.json is not None and item in req.json:
         return req.json[item]
     return default
 
