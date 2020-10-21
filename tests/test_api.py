@@ -64,9 +64,6 @@ class TestApi(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test fixtures."""
-        if os.path.exists(SERVER_RESULTS_DIR):
-            shutil.rmtree(SERVER_RESULTS_DIR)
-        os.mkdir(SERVER_RESULTS_DIR)
         server.set_provider(
             FileProvider(os.path.join(os.path.dirname(__file__), "data"), SERVER_RESULTS_DIR)
         )
@@ -74,8 +71,10 @@ class TestApi(unittest.TestCase):
         api_thread.daemon = True
         api_thread.start()
         directory = os.path.join(os.path.dirname(__file__), "session_state_files")
-        for filename in os.listdir(directory):
-            shutil.copy(os.path.join(directory, filename), os.path.join(SERVER_RESULTS_DIR))
+        # for filename in os.listdir(directory):
+        if os.path.exists(SERVER_RESULTS_DIR):
+            shutil.rmtree(SERVER_RESULTS_DIR)
+        shutil.copytree(directory, os.path.join(SERVER_RESULTS_DIR))
 
     # Test Ids Request Tests
     def test_test_ids_request_success(self):
@@ -322,7 +321,21 @@ class TestApi(unittest.TestCase):
 
         response = post("/session/results", files=files)
 
-        # payload["round_id"] = 1
+        _check_response(response)
+
+        result_files = {
+            ProtocolConstants.DETECTION: os.path.join(
+                os.path.dirname(__file__), "test_results_OND.1.1.1234.csv"
+            )
+        }
+
+        payload = {
+            "session_id": "post_results",
+            "test_id": "OND.1.1.1234",
+            "round_id": 0,
+            "result_types": "|".join(result_files.keys())
+        }
+
         files = {"test_identification": io.StringIO(json.dumps(payload))}
         for r_type in result_files:
             with open(result_files[r_type], "r") as f:
@@ -330,6 +343,8 @@ class TestApi(unittest.TestCase):
                 files[f"{r_type}_file"] = io.StringIO(contents)
 
         response = post("/session/results", files=files)
+
+        _check_response(response)
 
         payload["round_id"] = 1
         files = {"test_identification": io.StringIO(json.dumps(payload))}
@@ -443,3 +458,14 @@ class TestApi(unittest.TestCase):
         self.assertEqual("OND", metadata["protocol"])
         self.assertEqual(3, metadata["known_classes"])
         self.assertFalse("threshold" in metadata)
+
+    def test_get_session_status(self):
+        response = get(
+            "/session/status",
+            params={"session_id": "get_feedback", "include_tests": True, "test_ids": "|".join(["OND.1.1.1234", "bad_test"])}
+        )
+
+        _check_response(response)
+        actual = response.content.decode("utf-8")
+        expected = "get_feedback, OND.1.1.1234, 2020-09-25 11:05:23.986603, Incomplete\nget_feedback, bad_test, N/A, Incomplete"
+        self.assertEqual(expected, actual)
