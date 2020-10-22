@@ -17,6 +17,8 @@ from requests import Response
 from json import JSONDecodeError
 
 # Helpers
+
+
 def _check_response(response: Response) -> None:
     """
     Raise the appropriate ApiError based on response error code.
@@ -40,7 +42,7 @@ def _check_response(response: Response) -> None:
 
 
 def get(path: str, **params: Dict[str, Any]) -> Response:
-        return requests.get(f"http://localhost:12345{path}", **params)
+    return requests.get(f"http://localhost:12345{path}", **params)
 
 
 def post(path: str, **params: Dict[str, Any]) -> Response:
@@ -51,7 +53,9 @@ def delete(path: str, **params: Dict[str, Any]) -> Response:
     return requests.delete(f"http://localhost:12345{path}", **params)
 
 
-SERVER_RESULTS_DIR = os.path.join(os.path.dirname(__file__), f"server_results_unit_tests")
+SERVER_RESULTS_DIR = os.path.join(
+    os.path.dirname(__file__), f"server_results_unit_tests")
+
 
 class TestApi(unittest.TestCase):
     """Test the API."""
@@ -68,14 +72,16 @@ class TestApi(unittest.TestCase):
             shutil.rmtree(SERVER_RESULTS_DIR)
         os.mkdir(SERVER_RESULTS_DIR)
         server.set_provider(
-            FileProvider(os.path.join(os.path.dirname(__file__), "data"), SERVER_RESULTS_DIR)
+            FileProvider(os.path.join(os.path.dirname(
+                __file__), "data"), SERVER_RESULTS_DIR)
         )
         api_thread = threading.Thread(target=server.init, args=("localhost", 12345))
         api_thread.daemon = True
         api_thread.start()
         directory = os.path.join(os.path.dirname(__file__), "session_state_files")
         for filename in os.listdir(directory):
-            shutil.copy(os.path.join(directory, filename), os.path.join(SERVER_RESULTS_DIR))
+            shutil.copy(os.path.join(directory, filename),
+                        os.path.join(SERVER_RESULTS_DIR))
 
     # Test Ids Request Tests
     def test_test_ids_request_success(self):
@@ -129,14 +135,16 @@ class TestApi(unittest.TestCase):
         session_id = response.json()["session_id"]
 
         self.assertEqual(session_id, str(uuid.UUID(session_id)))
-        self.assertTrue(os.path.exists(os.path.join(SERVER_RESULTS_DIR, f"{session_id}.json")))
+        self.assertTrue(os.path.exists(os.path.join(
+            SERVER_RESULTS_DIR, f"{session_id}.json")))
 
     # Dataset Request Tests
     def test_dataset_request_success_with_round_id(self):
         """Test dataset request with rounds."""
         response = get(
             "/session/dataset",
-            params={"session_id": "data_request", "test_id": "OND.1.1.1234", "round_id": 0},
+            params={"session_id": "data_request",
+                    "test_id": "OND.1.1.1234", "round_id": 0},
         )
 
         _check_response(response)
@@ -176,7 +184,8 @@ class TestApi(unittest.TestCase):
 
     def test_get_feedback_success_multiple_types(self):
         """Test get_feedback with multiple types."""
-        feedback_types = [ProtocolConstants.CLASSIFICATION, ProtocolConstants.CHARACTERIZATION]
+        feedback_types = [ProtocolConstants.CLASSIFICATION,
+                          ProtocolConstants.CHARACTERIZATION]
         response = get(
             "/session/feedback",
             params={
@@ -191,7 +200,8 @@ class TestApi(unittest.TestCase):
         multipart_data = decoder.MultipartDecoder.from_response(response)
         result_dicts = []
         for i in range(len(feedback_types)):
-            header = multipart_data.parts[i].headers[b"Content-Disposition"].decode("utf-8")
+            header = multipart_data.parts[i].headers[b"Content-Disposition"].decode(
+                "utf-8")
             header_dict = {
                 x[0].strip(): x[1].strip(" \"'")
                 for x in [part.split("=") for part in header.split(";") if "=" in part]
@@ -202,11 +212,52 @@ class TestApi(unittest.TestCase):
         actual = []
         for i, part in enumerate(multipart_data.parts):
             actual = part.content.decode("utf-8")
+            print('-----')
+            print(actual)
+            print('-----')
             self.assertEqual(expected[i], actual)
 
         for i, head in enumerate(result_dicts):
             self.assertEqual(feedback_types[i], head["name"])
-            self.assertEqual(f"get_feedback.OND.1.1.1234.1_{feedback_types[i]}.csv", head["filename"])
+            self.assertEqual(
+                f"get_feedback.OND.1.1.1234.1_{feedback_types[i]}.csv", head["filename"])
+
+    def test_get_feedback_success_classification(self):
+        """Test get_feedback with classification."""
+        feedback_types = [ProtocolConstants.CLASSIFICATION]
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": feedback_types[0],
+                "session_id": "get_feedback",
+                "test_id": "OND.1.1.1234",
+                "round_id": 1,
+            },
+        )
+
+        _check_response(response)
+        expected = "n01484850_4515.JPEG,0\nn01484850_45289.JPEG,2\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
+    def test_get_feedback_success_single_classification(self):
+        """Test get_feedback with classification."""
+        feedback_types = [ProtocolConstants.CLASSIFICATION]
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": feedback_types[0],
+                "feedback_ids": ["n01484850_45289.JPEG"],
+                "session_id": "get_feedback",
+                "test_id": "OND.1.1.1234",
+                "round_id": 1,
+            },
+        )
+
+        _check_response(response)
+        expected = "n01484850_45289.JPEG,2\n"
+        actual = actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
 
     def test_get_feedback_failure_no_round_id(self):
         """Test get_feedback fails with no round id."""
@@ -402,7 +453,8 @@ class TestApi(unittest.TestCase):
         """Test evaluate with rounds."""
         response = get(
             "/session/evaluations",
-            params={"session_id": "evaluation", "test_id": "OND.1.1.1234", "round_id": 0},
+            params={"session_id": "evaluation",
+                    "test_id": "OND.1.1.1234", "round_id": 0},
         )
 
         _check_response(response)

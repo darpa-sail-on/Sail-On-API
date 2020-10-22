@@ -1,5 +1,5 @@
 {
-  "domain": "transcripts",
+  "domain": "image_classification",
   "protocol": "OND",
   "known_classes": 3,
   "max_novel_classes": 2,
