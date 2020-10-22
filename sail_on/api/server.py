@@ -449,6 +449,8 @@ def post_results_get_feedback() -> Response:
         test_id = data["test_id"]
         round_id = data["round_id"]
         result_types = data["result_types"].split("|")
+        feedback_types = data.get("feedback_types", [])
+        feedback_types = feedback_types.split("|")
         result_files = {}
         for r_type in result_types:
             result_files[r_type] = get_from_request(
@@ -461,7 +463,7 @@ def post_results_get_feedback() -> Response:
             raise KeyError
 
         logging.info(
-            f"PostResults called with session_id: {session_id} test_id: {test_id} round_id: {round_id} result file types: {result_types}"  # noqa: E501
+            f"PostResults called with session_id: {session_id} test_id: {test_id} round_id: {round_id} result file types: {result_types} feedback types: {feedback_types}"  # noqa: E501
         )
     except KeyError:
         raise ProtocolError(
@@ -476,7 +478,7 @@ def post_results_get_feedback() -> Response:
         logging.info("Post Results was successful. Retrieving feedback")
 
         responses = {}
-        for f_type in result_types:
+        for f_type in feedback_types:
             responses[f_type] = Binder.provider.get_feedback([], f_type, session_id, test_id, round_id)
     except ServerError as e:
         raise e
