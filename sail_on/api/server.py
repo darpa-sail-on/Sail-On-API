@@ -59,7 +59,7 @@ def get_from_request(
         return req.files[item].read().decode("utf-8")
     elif item in req.args:
         return req.args[item]
-    elif item in req.json:
+    elif req.json is not None and item in req.json:
         return req.json[item]
     return default
 
@@ -449,6 +449,8 @@ def post_results_get_feedback() -> Response:
         test_id = data["test_id"]
         round_id = data["round_id"]
         result_types = data["result_types"].split("|")
+        feedback_types = data.get("feedback_types", [])
+        feedback_types = feedback_types.split("|")
         result_files = {}
         for r_type in result_types:
             result_files[r_type] = get_from_request(
@@ -461,7 +463,7 @@ def post_results_get_feedback() -> Response:
             raise KeyError
 
         logging.info(
-            f"PostResults called with session_id: {session_id} test_id: {test_id} round_id: {round_id} result file types: {result_types}"  # noqa: E501
+            f"PostResults called with session_id: {session_id} test_id: {test_id} round_id: {round_id} result file types: {result_types} feedback types: {feedback_types}"  # noqa: E501
         )
     except KeyError:
         raise ProtocolError(
@@ -476,7 +478,7 @@ def post_results_get_feedback() -> Response:
         logging.info("Post Results was successful. Retrieving feedback")
 
         responses = {}
-        for f_type in result_types:
+        for f_type in feedback_types:
             responses[f_type] = Binder.provider.get_feedback([], f_type, session_id, test_id, round_id)
     except ServerError as e:
         raise e
@@ -595,6 +597,7 @@ def session_status() -> str:
         Arguments:
             -after date time iso formatted string lower bound
             -session_id specific session
+            -test_ids look for specific test ids
             -include_tests provide all tests in session(s)
         Returns:
             CSV of session id and start date time and, termination date time stamp in iso format
@@ -605,13 +608,16 @@ def session_status() -> str:
     # Attempts to retrieve the proper variables from the API call body,
     # and passes them to the provider function
     data = request.args
-    after = data["after"] if 'after' in data else None
-    session_id = data["session_id"] if 'session_id' in data else None
-    include_tests = data["include_tests"] if 'include_tests' in data else False
+    after = data.get("after", None)
+    session_id = data.get("session_id", None)
+    test_ids = data.get("test_ids", None)
+    if test_ids:
+        test_ids = test_ids.split("|")
+    include_tests = data.get("include_tests", False)
     include_tests = include_tests if type(include_tests) == bool else include_tests.lower() == 'true'
 
     try:
-        return Binder.provider.session_status(after, session_id, include_tests).encode('utf-8')
+        return Binder.provider.session_status(after, session_id, include_tests, test_ids).encode('utf-8')
     except ServerError as e:
         raise e
     except ProtocolError as e:
@@ -626,6 +632,7 @@ def session_zip() -> str:
 
     Arguments:
         -session_id date time stamp in iso format
+        -test_id(s)
     Returns:
         -zip file of session files
     """
@@ -635,6 +642,9 @@ def session_zip() -> str:
     data = request.args
     try:
         session_id = data["session_id"]
+        test_ids = data.get("test_id", None)
+        if test_ids:
+            test_ids = test_ids.split("|")
         logging.info(f"Zip Session called with session_id: {session_id}")
     except KeyError:
         raise ProtocolError(
@@ -644,7 +654,7 @@ def session_zip() -> str:
         )
 
     try:
-        file_path = Binder.provider.get_session_zip(session_id)
+        file_path = Binder.provider.get_session_zip(session_id, test_ids)
         return send_file(
             file_path,
             attachment_filename=f"{session_id}.zip",

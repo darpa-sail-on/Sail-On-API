@@ -35,9 +35,10 @@ def log_session(
     folder: str,
     session_id: str,
     activity: str,
-    test_id: str = None,
+    test_id: Optional[str] = None,
     round_id: Optional[int] = None,
     content: Optional[Dict[str, Any]] = None,
+    content_loc: Optional[str] = "round",
 ) -> None:
     """Create a log file of all session activity."""
     structure = get_session_info(folder, session_id)
@@ -50,6 +51,9 @@ def log_session(
         if activity not in activities:
             activities[activity] = {"time": [str(datetime.datetime.now())]}
         tests = activities[activity].get("tests", {})
+        if content_loc == "activity":
+            if content is not None:
+                activities[activity].update(content)
         if test_id not in tests:
             tests[test_id] = {}
         if round_id is None:
@@ -62,12 +66,16 @@ def log_session(
         else:
             round_id = str(round_id)
             rounds = tests[test_id].get("rounds", {})
+            if content_loc == "test":
+                if content is not None:
+                    tests[test_id].update(content)
             if round_id not in rounds:
                 rounds[round_id] = {"time": [str(datetime.datetime.now())]}
             else:
                 rounds[round_id]["time"].append(str(datetime.datetime.now()))
-            if content is not None:
-                rounds[round_id].update(content)
+            if content_loc == "round":
+                if content is not None:
+                    rounds[round_id].update(content)
             tests[test_id]["rounds"] = rounds
             tests[test_id]["last round"] = round_id
         activities[activity]["tests"] = tests
@@ -523,7 +531,7 @@ class FileProvider(Provider):
                 "files": [ProtocolConstants.CLASSIFICATION]
             }
         },
-        "activity": {
+        "activity_recognition" : {
             ProtocolConstants.CLASSIFICATION:  {
                 "function": get_cluster_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
@@ -630,16 +638,39 @@ class FileProvider(Provider):
             raise e
         except Exception as e:
             raise RoundError(
-                "SessionLogError", "Error checking session log for round history. Ensure results have been posted before requesting feedback")
+                "SessionLogError", 
+                "Error checking session log for round history. Ensure results have been posted before requesting feedback",
+                traceback.format_exc()
+            )
 
-        # If detection is required, ensure detection has been posted for the requested round
-        if self.feedback_request_mapping[metadata["domain"]][feedback_type].get("detection_req", False):
-            if "detection file path" not in structure["activity"]["post_results"]["tests"][test_id]["rounds"][round_id]:
+        # If detection is required, ensure detection has been posted for the requested round and novelty claimed for the test
+        if self.feedback_request_mapping[domain][feedback_type].get("detection_req", False):
+            test_log = structure["activity"]["post_results"]["tests"][test_id]
+            if "detection file path" not in test_log:
                 raise ProtocolError(
                     "DetectionPostRequired",
                     "A detection file is required to be posted before feedback can be requested on a round. Please submit Detection results before requesting feedback"
                 )
+            else:
+                try:
+                    with open(test_log["detection file path"]) as d_file:
+                        d_reader = csv.reader(d_file, delimiter=",")
+                        lines = [x for x in d_reader]
+                    values = [float(x[1]) for x in lines]
+                    if max(values) < metadata["threshold"]:
+                        raise ProtocolError(
+                            "NoveltyDetectionRequired", 
+                            f"In order to request {feedback_type} for domain {domain}, novelty must be declared for the test"
+                        )
 
+                except Exception as e:
+                    raise ServerError(
+                        "CantReadFile", 
+                        f"Couldnt open the logged detection file at {test_log['detection file path']}. Please check if the file exists and that {session_id}.json has the proper file location for test id {test_id}",
+                        traceback.format_exc()
+                    )
+
+        
         if len(results_files) < 1:
             raise ServerError(
                 "result_file_not_found",
@@ -711,6 +742,16 @@ class FileProvider(Provider):
         """Post results."""
         # Modify session file with posted results
         info = get_session_info(self.results_folder, session_id)
+        if "detection" in result_files.keys():
+            try:
+                if "detection" in info["activity"]["post_results"]["tests"][test_id]["rounds"][str(round_id)]["types"]:
+                    raise ProtocolError(
+                    "DetectionRepost",
+                    "Cannot re post detection for a given round. If you attempted to submit any other results, please resubmit without detection."
+                )
+            except KeyError:
+                pass
+
         protocol = info["activity"]["created"]["protocol"]
         domain = info["activity"]["created"]["domain"]
         os.makedirs(os.path.join(self.results_folder, protocol, domain), exist_ok=True)
@@ -729,6 +770,7 @@ class FileProvider(Provider):
                 result_file.write(result_files[r_type])
 
         # Log call
+        log_content["last round"] = round_id
         log_session(
             self.results_folder,
             activity="post_results",
@@ -736,7 +778,15 @@ class FileProvider(Provider):
             test_id=test_id,
             round_id=round_id,
             content=log_content,
+            content_loc="test"
         )
+
+        structure = get_session_info(self.results_folder, session_id)
+        prev_types = structure["activity"]["post_results"]["tests"][test_id]["rounds"][str(round_id)].get("types", [])
+        new_types =  prev_types + list(result_files.keys())
+        structure["activity"]["post_results"]["tests"][test_id]["rounds"][str(round_id)]["types"] = new_types
+        with open(os.path.join(self.results_folder, f"{str(session_id)}.json"), "w") as session_file:
+            json.dump(structure, session_file, indent=2)
 
     def evaluate(self, session_id: str, test_id: str, round_id: int) -> str:
         """Perform evaluation."""
@@ -756,7 +806,7 @@ class FileProvider(Provider):
         # Modify session file to indicate session has been terminated
         log_session(self.results_folder, session_id=session_id, activity="termination")
 
-    def session_status(self, after: str = None, session_id: str = None, include_tests: bool = False) -> str:
+    def session_status(self, after: str = None, session_id: str = None, include_tests: bool = False, test_ids:List[str] = None) -> str:
         """
         Retrieve Session Names
         :param after: Date Time String lower
@@ -786,16 +836,18 @@ class FileProvider(Provider):
                 else:
                     creation_time = 'N/A'
                 session_name = os.path.splitext(os.path.basename(session_file))[0]
-                test_ids = session_data['activity'].get('post_results', {}).get('tests', {}) \
-                    if include_tests and created else None
-                if (session_id is None and (not lower_bound or
-                                            lower_bound <= parser.isoparse(terminate_time))) or \
-                        session_name == session_id:
+                tests = session_data['activity'].get('post_results', {}).get('tests', {}) if include_tests and created else None
+                if (session_id is None and (not lower_bound or lower_bound <= parser.isoparse(terminate_time))) or session_name == session_id:
                     if include_tests:
-                        if test_ids:
+                        if test_ids is None:
+                            test_ids = tests
+                        if tests and test_ids:
                             for test_id in test_ids:
-                                results.append(
-                                    f'{session_name}, {test_id}, {creation_time},{terminate_time}')
+                                if test_id in tests:
+                                    creation_time = session_data['activity']['post_results']['tests'][test_id]['rounds']['0']['time'][0]
+                                else:
+                                    creation_time = 'N/A'
+                                results.append(f'{session_name}, {test_id}, {creation_time}, {terminate_time}')
                         else:
                             results.append(
                                 f'{session_name}, NA, {creation_time}, {terminate_time}')
@@ -805,10 +857,11 @@ class FileProvider(Provider):
         results = sorted(results, key=lambda x: (x.split(',')[1], x.split(',')[0]))
         return '\n'.join(results)
 
-    def get_session_zip(self, session_id) -> str:
+    def get_session_zip(self, session_id: str, test_ids: List[str] = None) -> str:
         """
         Retrieve Completed Session Names
         :param session_id
+        :param test_id
         :return: zip file path
         """
         zip_file_name = os.path.join(self.results_folder, f'{session_id}.zip')
@@ -818,12 +871,19 @@ class FileProvider(Provider):
 
             for protocol in os.listdir(self.results_folder):
                 if os.path.isdir(os.path.join(self.results_folder, protocol)):
-                    for test_file in glob.glob(
-                            os.path.join(self.results_folder, protocol,
-                                         "**", f"{session_id}.*.csv"),
+                    if test_ids is None:
+                        test_files = glob.glob(
+                            os.path.join(self.results_folder, protocol, "**", f"{session_id}.*.csv"),
                             recursive=True,
-                    ):
-                        zip.write(test_file, arcname=test_file[len(
-                            self.results_folder) + 1:])
+                        )
+                    else:
+                        test_files = []
+                        for test_id in test_ids:
+                            test_files.extend(glob.glob(
+                                os.path.join(self.results_folder, protocol, "**", f"{session_id}.{test_id}*.csv"),
+                                recursive=True,
+                            ))
+                    for test_file in test_files:
+                        zip.write(test_file, arcname=test_file[len(self.results_folder) + 1:])
 
         return zip_file_name
