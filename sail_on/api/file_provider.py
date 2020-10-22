@@ -508,7 +508,7 @@ class FileProvider(Provider):
                 "files" : [ProtocolConstants.CLASSIFICATION]
             }
         },
-        "activity" : {
+        "activity_recognition" : {
             ProtocolConstants.CLASSIFICATION:  {
                 "function" : get_cluster_feedback,
                 "files" : [ProtocolConstants.CLASSIFICATION],
