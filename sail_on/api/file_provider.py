@@ -342,7 +342,9 @@ class FileProvider(Provider):
             "protocol",
             "known_classes",
             "max_novel_classes",
-            "round_size"
+            "round_size",
+            "feedback_max_ids",
+            "pre_novelty_batches"
         ]
 
         if session_id is not None:
