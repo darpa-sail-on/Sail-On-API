@@ -207,6 +207,41 @@ class TestApi(unittest.TestCase):
             self.assertEqual(feedback_types[i], head["name"])
             self.assertEqual(f"get_feedback.OND.1.1.1234.1_{feedback_types[i]}.csv", head["filename"])
 
+    def test_get_feedback_success_classification(self):
+        """Test get_feedback with classification."""
+        feedback_types = [ProtocolConstants.CLASSIFICATION]
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": feedback_types[0],
+                "session_id": "get_feedback",
+                "test_id": "OND.1.1.12345",
+                "round_id": 1,
+            },
+        )
+        _check_response(response)
+        expected = "n01484850_4515.JPEG,0\nn01484850_45289.JPEG,2\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
+    def test_get_feedback_success_single_classification(self):
+        """Test get_feedback with classification."""
+        feedback_types = [ProtocolConstants.CLASSIFICATION]
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": feedback_types[0],
+                "feedback_ids": ["n01484850_45289.JPEG"],
+                "session_id": "get_feedback",
+                "test_id": "OND.1.1.12345",
+                "round_id": 1,
+            },
+        )
+        _check_response(response)
+        expected = "n01484850_45289.JPEG,2\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
     def test_get_feedback_failure_no_round_id(self):
         """Test get_feedback fails with no round id."""
         response = get(

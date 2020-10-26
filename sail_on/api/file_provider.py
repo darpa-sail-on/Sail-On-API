@@ -144,20 +144,22 @@ def get_classification_feedback(
         round_id: int,
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for classification type feedback"""
-    with open(gt_files[0], "r") as f:
-        gt_reader = csv.reader(f, delimiter=",")
-        ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
+    # Read detection files
     with open(result_files[0], "r") as rf:
-        result_reader = csv.reader(rf, delimiter=",")
-        results = read_feedback_file(result_reader, feedback_ids, metadata, False)
+        detection_result_reader = csv.reader(rf, delimiter=",")
+        detection_results = read_feedback_file(
+            detection_result_reader, feedback_ids, metadata, False)
 
-    return {
-        x: 0
-        if ground_truth[x][1:].index(max(ground_truth[x][1:])) !=
-           results[x][1:].index(max(results[x][1:]))
-        else 1
-        for x in ground_truth.keys()
-    }
+    # if we assume monotonically increasing detection results, we can only check first. But checking all for now.
+    assert all([v[0] > metadata["threshold"] for (k, v) in detection_results.items(
+    )]), "Novelty Detection score needs to be \">= threshold\" to request feedback. Discuss with TA1s to disable this."
+    # Read classification files
+    with open(gt_files[1], "r") as f:
+        gt_reader = csv.reader(f, delimiter=",")
+        ground_truth = read_feedback_file(
+            gt_reader, feedback_ids, metadata, True, round_id)
+
+    return {x: np.argmax(ground_truth[x]) for x in ground_truth.keys()}
 
 
 def get_detection_feedback(
@@ -177,6 +179,8 @@ def get_detection_feedback(
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata, False)
 
+    # this is incorrect; but since detection feedback is not allowed; leaving it as is.
+    raise NameError('DetectionFeedback is not supported.')
     return {
         x: 0 if abs(ground_truth[x][0] - results[x][0]) > threshold else 1
         for x in ground_truth.keys()
