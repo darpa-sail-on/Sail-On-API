@@ -75,7 +75,7 @@ def get_test_metadata() -> Response:
     """
     data = request.args
     try:
-        session_id = data.get("session_id", None)
+        session_id = data["session_id"]
         test_id = data["test_id"]
         logging.info(f"Retrieved metadata for Session ID {session_id} Test Id {test_id}")
     except KeyError:
@@ -191,6 +191,7 @@ def new_session() -> Dict[str, str]:
     Arguments:
         -test_ids
         -protocol
+        -domain
         -novelty_detector_version
     Returns:
         -session_id
@@ -208,6 +209,7 @@ def new_session() -> Dict[str, str]:
             )
         data = json.loads(val) if type(val) is not dict else val
         protocol = data["protocol"]
+        domain = data["domain"]
         novelty_version = data["novelty_detector_version"]
         hints = data.get("hints", [])
 
@@ -217,12 +219,12 @@ def new_session() -> Dict[str, str]:
             reader = request.files["test_ids"].read().decode("utf-8").split("\n")
             test_ids = [x.strip(" \"',") for x in filter(lambda x: x != "", reader)]
         logging.info(
-            f"NewSession called with test_ids: {test_ids} protocol: {protocol} novelty_detector_version: {novelty_version}"  # noqa: E501
+            f"NewSession called with test_ids: {test_ids} protocol: {protocol} domain: {domain} novelty_detector_version: {novelty_version}"  # noqa: E501
         )
     except KeyError:
         raise ProtocolError(
             "MissingParamsError",
-            "NewSession requires test_ids, protocol, and novelty_detector_version",
+            "NewSession requires test_ids, protocol, domain, and novelty_detector_version",
             traceback.format_exc(),
         )
 
@@ -230,7 +232,7 @@ def new_session() -> Dict[str, str]:
         raise ProtocolError("EmptyFile", "Select Test Ids is missing")
 
     try:
-        response = Binder.provider.new_session(test_ids, protocol, novelty_version, hints)
+        response = Binder.provider.new_session(test_ids, protocol, domain, novelty_version, hints)
 
         logging.info(f"Returning session_id: {response}")
         return {"session_id": response}
@@ -262,9 +264,9 @@ def dataset_request() -> Response:
     try:
         session_id = data["session_id"]
         test_id = data["test_id"]
-        round_id = data.get("round_id")
+        round_id = data["round_id"]
         logging.info(
-            f"DatasetRequest called with session_id: {session_id} test_id: {test_id} round_id: {round_id}"  # noqa: E501
+            f"DatasetRequest called with session_id: {session_id} test_id: {test_id} round_id: {round_id}"
         )
     except KeyError:
         raise ProtocolError(

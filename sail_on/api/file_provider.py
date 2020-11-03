@@ -328,11 +328,13 @@ class FileProvider(Provider):
 
     def get_test_metadata(self, session_id: str, test_id: str, api_call: bool = True) -> Dict[str, Any]:
         """Get test metadata"""
-        metadata_location = glob.glob(
-            os.path.join(self.folder, "**", f"{test_id}_metadata.json"), recursive=True
-        )
+        try:
+            info = get_session_info(self.results_folder, session_id)['activity']['created']
+            metadata_location = os.path.join(self.folder, info["protocol"], info["domain"], f"{test_id}_metadata.json")
+        except KeyError:
+            raise ProtocolError("session_id_invalid", f"Provided session id {session_id} could not be found or was improperly set up")
 
-        if len(metadata_location) == 0:
+        if not os.path.exists(metadata_location):
             raise ServerError(
                 "metadata_not_found",
                 f"Metadata file for Test Id {test_id} could not be found",
@@ -357,7 +359,7 @@ class FileProvider(Provider):
 
         approved_metadata.extend([data for data in ["red_light"] if data in hints])
 
-        with open(metadata_location[0], "r") as md:
+        with open(metadata_location, "r") as md:
             if api_call:
                 return {
                     k: v for k, v in json.load(md).items()
@@ -390,22 +392,18 @@ class FileProvider(Provider):
         return {"test_ids": file_location, "generator_seed": "1234"}
 
     def new_session(
-        self, test_ids: List[str], protocol: str, novelty_detector_version: str, hints: List[str]
+        self, test_ids: List[str], protocol: str, domain: str, novelty_detector_version: str, hints: List[str]
     ) -> str:
         """Create a session."""
         # Verify's that all given test id's are valid and have associated csv files
         for test_id in test_ids:
-            file_locations = glob.glob(
-                os.path.join(self.folder, protocol, "**", f"{test_id}.csv"), recursive=True
-            )
-            if len(file_locations) == 0:
+            file_location = os.path.join(self.folder, protocol, domain, f"{test_id}.csv")
+            if not os.path.exists(file_location):
                 raise ServerError(
                     "test_id_invalid",
                     f"Test Id {test_id} could not be matched to a specific file",
                     traceback.format_stack(),
                 )
-
-            domain = (file_locations[0]).split(os.path.sep)[-2]
 
         session_id = str(uuid.uuid4())
 
@@ -425,10 +423,13 @@ class FileProvider(Provider):
 
     def dataset_request(self, session_id: str, test_id: str, round_id: int) -> FileResult:
         """Request a dataset."""
-        file_locations = glob.glob(
-            os.path.join(self.folder, "**", f"{test_id}.csv"), recursive=True
-        )
-        if len(file_locations) == 0:
+        try:
+            info = get_session_info(self.results_folder, session_id)['activity']['created']
+            file_location = os.path.join(self.folder, info["protocol"], info["domain"], f"{test_id}.csv")
+        except KeyError:
+            raise ProtocolError("session_id_invalid", f"Provided session id {session_id} could not be found or was improperly set up")
+        
+        if not os.path.exists(file_location):
             raise ServerError(
                 "test_id_invalid",
                 f"Test Id {test_id} could not be matched to a specific file",
@@ -440,7 +441,7 @@ class FileProvider(Provider):
         if round_id is not None:
             temp_file_path = BytesIO()
 
-            with open(file_locations[0], "r") as f:
+            with open(file_location, "r") as f:
                 lines = f.readlines()
                 lines = [x for x in lines if x.strip("\n\t\"',.") != ""]
                 try:
@@ -454,13 +455,13 @@ class FileProvider(Provider):
                 if round_pos >= len(lines):
                     raise RoundError(
                         "round_id_invalid",
-                        f"Round id {str(round_id)} is out of scope for test id {test_id}. Check the metadata round_size.",  # noqa: E501,
+                        f"Round id {str(round_id)} is out of scope for test id {test_id}. Check the metadata round_size.",
                         traceback.format_stack(),
                     )
                 temp_file_path.write(''.join(lines[round_pos:round_pos + int(metadata["round_size"])]).encode('utf-8'))
                 temp_file_path.seek(0)
         else:
-            temp_file_path = open(file_locations[0], 'rb')
+            temp_file_path = open(file_location, 'rb')
 
         log_session(
             self.results_folder,
@@ -579,24 +580,25 @@ class FileProvider(Provider):
                 )
             ground_truth_files = []
             for t in file_types:
-                ground_truth_files.extend(glob.glob(
-                    os.path.join(self.folder, "**", f"{test_id}_{t}.csv"),
-                    recursive=True,
-                ))
+                ground_truth_files.append(os.path.join(self.folder, metadata["protocol"], domain, f"{test_id}_{t}.csv"))
 
-                if len(ground_truth_files) < 1:
-                    raise ServerError(
-                        "test_id_invalid",
-                        f"Could not find ground truth file(s) for test Id {test_id} with feedback type {feedback_type}",  # noqa: E501
-                        traceback.format_stack(),
-                    )
+            if len(ground_truth_files) < len(file_types):
+                raise ServerError(
+                    "test_id_invalid",
+                    f"Could not find ground truth file(s) for test Id {test_id} with feedback type {feedback_type}",
+                    traceback.format_stack(),
+                )
 
             results_files = []
             for t in file_types:
-                results_files.extend(glob.glob(
-                    os.path.join(self.results_folder,"**",f"{str(session_id)}.{str(test_id)}_{t}.csv"),
-                    recursive=True,
-                ))
+                results_files.append(os.path.join(self.results_folder,metadata["protocol"], domain,f"{str(session_id)}.{str(test_id)}_{t}.csv"))
+
+            if len(results_files) < len(file_types):
+                raise ServerError(
+                    "test_id_invalid",
+                    f"Could not find posted result file(s) for test Id {test_id} with feedback type {feedback_type}",
+                    traceback.format_stack(),
+                )
         else:
             raise ProtocolError(
                 "BadDomain", 
@@ -652,7 +654,7 @@ class FileProvider(Provider):
         if len(results_files) < 1:
             raise ServerError(
                 "result_file_not_found",
-                f"No result file(s) could be found in {self.results_folder}. Make sure results are posted before calling get feedback.",  # noqa: E501
+                f"No result file(s) could be found in {self.results_folder}. Make sure results are posted before calling get feedback.",
                 traceback.format_stack(),
             )
 
@@ -680,7 +682,7 @@ class FileProvider(Provider):
         except KeyError:
             raise ProtocolError(
                 "feedback_type_invalid",
-                f"Feedback type {feedback_type} is not valid. Make sure the provider's feedback_algorithms variable is properly set up",  # noqa: E501
+                f"Feedback type {feedback_type} is not valid. Make sure the provider's feedback_algorithms variable is properly set up",
                 traceback.format_exc()
             )
 
