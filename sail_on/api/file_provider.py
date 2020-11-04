@@ -16,6 +16,7 @@ import numpy as np
 from sklearn.metrics.cluster import normalized_mutual_info_score
 from dateutil import parser
 import zipfile
+import re
 
 from typing import List, Optional, Dict, Any
 from csv import reader
@@ -204,6 +205,9 @@ def get_characterization_feedback(
         for x in ground_truth.keys()
     }
 
+def ensure_space(input_str): 
+    return ' '.join([x.strip() for x in re.split(r'(\W+)',input_str.replace(';','').replace('|','').replace('  ',' '))])
+
 def get_levenshtein_feedback(
         gt_file: str,
         result_files: List[str],
@@ -220,7 +224,7 @@ def get_levenshtein_feedback(
         results = read_feedback_file(result_reader, feedback_ids, metadata, False)
 
     return {
-        x: nltk.edit_distance(ground_truth[x][metadata["columns"][0]], results[x][metadata["columns"][0]])
+        x: nltk.edit_distance(ensure_space(ground_truth[x][metadata["columns"][0]]), ensure_space(results[x][metadata["columns"][0]]))
         for x in ground_truth.keys()
     }
 
