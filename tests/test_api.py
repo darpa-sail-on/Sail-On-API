@@ -164,7 +164,7 @@ class TestApi(unittest.TestCase):
 
     def test_get_feedback_success_multiple_types(self):
         """Test get_feedback with multiple types."""
-        feedback_types = [ProtocolConstants.CLASSIFICATION, ProtocolConstants.CHARACTERIZATION]
+        feedback_types = [ProtocolConstants.CLASSIFICATION, ProtocolConstants.TRANSCRIPTION]
         response = get(
             "/session/feedback",
             params={
@@ -186,7 +186,7 @@ class TestApi(unittest.TestCase):
             }
             result_dicts.append(header_dict)
 
-        expected = ["nmi,1.0\n0,1.0\n2,1.0\n", "nmi,1.0\n0,1.0\n"]
+        expected = ["nmi,0.0\n0,0.5\n", "n01484850_4515.JPEG,3\nn01484850_45289.JPEG,0\n"]
         actual = []
         for i, part in enumerate(multipart_data.parts):
             actual = part.content.decode("utf-8")
@@ -262,7 +262,7 @@ class TestApi(unittest.TestCase):
         )
 
         _check_response(response)
-        expected = "nmi,1.0\n0,1.0\n2,1.0\n"
+        expected = "nmi,0.0\n0,0.5\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
@@ -279,7 +279,7 @@ class TestApi(unittest.TestCase):
         )
 
         _check_response(response)
-        expected = "n01484850_4515.JPEG,3,0\nn01484850_45289.JPEG,0,0\n"
+        expected = "n01484850_4515.JPEG,3\nn01484850_45289.JPEG,0\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
@@ -298,7 +298,7 @@ class TestApi(unittest.TestCase):
         )
 
         _check_response(response)
-        expected = "n01484850_4515.JPEG,3,0\nn01484850_45289.JPEG,0,0\n"
+        expected = "n01484850_4515.JPEG,3\nn01484850_45289.JPEG,0\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
