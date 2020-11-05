@@ -493,13 +493,13 @@ class FileProvider(Provider):
             ProtocolConstants.CLASSIFICATION:  {
                 "function": get_classification_feedback,
                 "files": [ProtocolConstants.DETECTION, ProtocolConstants.CLASSIFICATION],
-                "columns": [4],
+                "columns": [1],
                 "detection_req": True
             },
             ProtocolConstants.PSUEDO_CLASSIFICATION: {
                 "function": psuedo_label_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
-                "columns": [4],
+                "columns": [1],
                 "detection_req": True
             }
         },
