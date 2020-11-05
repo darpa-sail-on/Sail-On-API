@@ -224,7 +224,13 @@ def get_levenshtein_feedback(
         results = read_feedback_file(result_reader, feedback_ids, metadata, False)
 
     return {
-        x: nltk.edit_distance(ensure_space(ground_truth[x][metadata["columns"][0]]), ensure_space(results[x][metadata["columns"][0]]))
+        x: [
+            nltk.edit_distance(
+                ensure_space(ground_truth[x][metadata["columns"][i]]), 
+                ensure_space(results[x][metadata["columns"][i]])
+            ) 
+            for i,_ in enumerate(metadata["columns"])
+        ]
         for x in ground_truth.keys()
     }
 
@@ -235,7 +241,7 @@ def get_cluster_feedback(
         metadata: Dict[str, Any],
         round_id: int,
 ) -> Dict[str, Any]:
-    """Calculates and returns the proper feedback for levenshtein type feedback"""
+    """Calculates and returns the proper feedback for cluster type feedback"""
     with open(gt_file, "r") as f:
         gt_reader = csv.reader(f, delimiter=",")
         ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
@@ -300,7 +306,7 @@ def psuedo_label_feedback(
 
     return_dict = {}
     for x in ground_truth.keys():
-        col = float(ground_truth[x][metadata["columns"][0]])
+        col = int(ground_truth[x][metadata["columns"][0]])
         if col not in labels:
             labels.append(col)
         return_dict[x] = labels.index(col)
