@@ -81,7 +81,7 @@ class TestApi(unittest.TestCase):
         """Test test_ids_request."""
         payload = {
             "protocol": "OND",
-            "domain": "image_classification",
+            "domain": "transcripts",
             "detector_seed": "5678",
         }
 
@@ -106,10 +106,11 @@ class TestApi(unittest.TestCase):
     def test_session_request_success(self):
         """Test session_request."""
         path = os.path.join(
-            os.path.dirname(__file__), "data/OND/image_classification/test_ids.csv"
+            os.path.dirname(__file__), "data/OND/transcripts/test_ids.csv"
         )
         payload = {
             "protocol": "OND",
+            "domain": "transcripts",
             "novelty_detector_version": "0.1.1",
         }
 
@@ -131,7 +132,7 @@ class TestApi(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(SERVER_RESULTS_DIR, f"{session_id}.json")))
 
     # Dataset Request Tests
-    def test_dataset_request_success_with_round_id(self):
+    def test_dataset_request_success(self):
         """Test dataset request with rounds."""
         response = get(
             "/session/dataset",
@@ -143,18 +144,6 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
-    def test_dataset_request_success_without_round_id(self):
-        """Test dataset request without rounds."""
-        response = get(
-            "/session/dataset",
-            params={"session_id": "data_request", "test_id": "OND.1.1.1234"},
-        )
-
-        _check_response(response)
-        expected = f"n01484850_18013.JPEG{os.linesep}n01484850_24624.JPEG{os.linesep}n01484850_4515.JPEG{os.linesep}n01484850_45289.JPEG{os.linesep}"
-        actual = response.content.decode("utf-8")
-        self.assertEqual(expected, actual)
-
     # Get feedback Tests
     def test_get_feedback_failure_invalid_type(self):
         """Test get_feedback with invalid type for domain."""
@@ -163,7 +152,7 @@ class TestApi(unittest.TestCase):
             params={
                 "feedback_ids": "|".join(["n01484850_4515.JPEG", "n01484850_45289.JPEG"]),
                 "feedback_type": ProtocolConstants.DETECTION,
-                "session_id": "get_feedback",
+                "session_id": "get_feedback_transcripts",
                 "test_id": "OND.1.1.1234",
                 "round_id": 0
             },
@@ -175,12 +164,12 @@ class TestApi(unittest.TestCase):
 
     def test_get_feedback_success_multiple_types(self):
         """Test get_feedback with multiple types."""
-        feedback_types = [ProtocolConstants.CLASSIFICATION, ProtocolConstants.CHARACTERIZATION]
+        feedback_types = [ProtocolConstants.CLASSIFICATION, ProtocolConstants.TRANSCRIPTION]
         response = get(
             "/session/feedback",
             params={
                 "feedback_type": "|".join(feedback_types),
-                "session_id": "get_feedback",
+                "session_id": "get_feedback_transcripts",
                 "test_id": "OND.1.1.1234",
                 "round_id": 1,
             },
@@ -197,7 +186,7 @@ class TestApi(unittest.TestCase):
             }
             result_dicts.append(header_dict)
 
-        expected = ["nmi,1.0\n0,1.0\n2,1.0\n", "nmi,1.0\n0,1.0\n"]
+        expected = ["nmi,0.0\n0,0.5\n", "n01484850_4515.JPEG,3\nn01484850_45289.JPEG,0\n"]
         actual = []
         for i, part in enumerate(multipart_data.parts):
             actual = part.content.decode("utf-8")
@@ -205,7 +194,7 @@ class TestApi(unittest.TestCase):
 
         for i, head in enumerate(result_dicts):
             self.assertEqual(feedback_types[i], head["name"])
-            self.assertEqual(f"get_feedback.OND.1.1.1234.1_{feedback_types[i]}.csv", head["filename"])
+            self.assertEqual(f"get_feedback_transcripts.OND.1.1.1234.1_{feedback_types[i]}.csv", head["filename"])
 
     def test_get_feedback_success_classification(self):
         """Test get_feedback with classification."""
@@ -214,8 +203,8 @@ class TestApi(unittest.TestCase):
             "/session/feedback",
             params={
                 "feedback_type": feedback_types[0],
-                "session_id": "get_feedback",
-                "test_id": "OND.1.1.12345",
+                "session_id": "get_feedback_image",
+                "test_id": "OND.1.1.1234",
                 "round_id": 1,
             },
         )
@@ -232,8 +221,8 @@ class TestApi(unittest.TestCase):
             params={
                 "feedback_type": feedback_types[0],
                 "feedback_ids": ["n01484850_45289.JPEG"],
-                "session_id": "get_feedback",
-                "test_id": "OND.1.1.12345",
+                "session_id": "get_feedback_image",
+                "test_id": "OND.1.1.1234",
                 "round_id": 1,
             },
         )
@@ -250,7 +239,7 @@ class TestApi(unittest.TestCase):
                 "feedback_ids": "|".join(
                     ["n01484850_4515.JPEG", "n01484850_45289.JPEG"]),
                 "feedback_type": ProtocolConstants.CLASSIFICATION,
-                "session_id": "get_feedback",
+                "session_id": "get_feedback_transcripts",
                 "test_id": "OND.1.1.1234",
             },
         )
@@ -266,14 +255,14 @@ class TestApi(unittest.TestCase):
             "/session/feedback",
             params={
                 "feedback_type": ProtocolConstants.CLASSIFICATION,
-                "session_id": "get_feedback",
+                "session_id": "get_feedback_transcripts",
                 "test_id": "OND.1.1.1234",
                 "round_id": 1,
             },
         )
 
         _check_response(response)
-        expected = "nmi,1.0\n0,1.0\n2,1.0\n"
+        expected = "nmi,0.0\n0,0.5\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
@@ -283,14 +272,14 @@ class TestApi(unittest.TestCase):
             "/session/feedback",
             params={
                 "feedback_type": ProtocolConstants.TRANSCRIPTION,
-                "session_id": "get_feedback",
+                "session_id": "get_feedback_transcripts",
                 "test_id": "OND.1.1.1234",
                 "round_id": 1,
             },
         )
 
         _check_response(response)
-        expected = "n01484850_4515.JPEG,3,0\nn01484850_45289.JPEG,0,0\n"
+        expected = "n01484850_4515.JPEG,3\nn01484850_45289.JPEG,0\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
@@ -302,14 +291,14 @@ class TestApi(unittest.TestCase):
                 "feedback_ids": "|".join(
                     ["n01484850_4515.JPEG", "n01484850_45289.JPEG", "404_id.JPEG"]),
                 "feedback_type": ProtocolConstants.TRANSCRIPTION,
-                "session_id": "get_feedback",
+                "session_id": "get_feedback_transcripts",
                 "test_id": "OND.1.1.1234",
                 "round_id": 1,
             },
         )
 
         _check_response(response)
-        expected = "n01484850_4515.JPEG,3,0\nn01484850_45289.JPEG,0,0\n"
+        expected = "n01484850_4515.JPEG,3\nn01484850_45289.JPEG,0\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
@@ -321,7 +310,7 @@ class TestApi(unittest.TestCase):
                 "feedback_ids": "|".join(
                     ["n01484850_4515.JPEG", "n01484850_45289.JPEG"]),
                 "feedback_type": ProtocolConstants.PSUEDO_CLASSIFICATION,
-                "session_id": "get_feedback",
+                "session_id": "get_feedback_transcripts",
                 "test_id": "OND.1.1.1234",
                 "round_id": 1,
             },
@@ -484,7 +473,9 @@ class TestApi(unittest.TestCase):
     def test_get_metadata_success(self):
         response = get(
             "/test/metadata",
-            params={"test_id": "OND.1.1.1234"},
+            params={
+                "session_id": "data_request",
+                "test_id": "OND.1.1.1234"},
         )
 
         _check_response(response)
@@ -497,10 +488,10 @@ class TestApi(unittest.TestCase):
     def test_get_session_status(self):
         response = get(
             "/session/status",
-            params={"session_id": "get_feedback", "include_tests": True, "test_ids": "|".join(["OND.1.1.1234", "bad_test"])}
+            params={"session_id": "get_feedback_transcripts", "include_tests": True, "test_ids": "|".join(["OND.1.1.1234", "bad_test"])}
         )
 
         _check_response(response)
         actual = response.content.decode("utf-8")
-        expected = "get_feedback, OND.1.1.1234, 2020-09-25 11:05:23.986603, Incomplete\nget_feedback, bad_test, N/A, Incomplete"
+        expected = "get_feedback_transcripts, OND.1.1.1234, 2020-09-25 11:05:23.986603, Incomplete\nget_feedback_transcripts, bad_test, N/A, Incomplete"
         self.assertEqual(expected, actual)
