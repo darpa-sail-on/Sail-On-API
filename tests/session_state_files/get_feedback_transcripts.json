@@ -1,0 +1,68 @@
+{
+  "activity": {
+    "created": {
+      "time": "2020-04-06 11:03:00.144872",
+      "protocol": "OND",
+      "domain": "transcripts",
+      "detector": "0.1.1"
+    },
+    "psuedo_labels": {
+      "classification": [1, 2]
+    },
+    "data_request": {
+      "time": "2020-04-06 10:51:13.436315",
+      "tests": {
+        "OND.1.1.1234": {
+          "time": "2020-04-06 11:03:43.138616"
+        },
+        "OND.1.1.12345": {
+          "time": "2020-04-06 11:03:43.138616"
+        }
+      }
+    },
+    "post_results": {
+      "time": [
+        "2020-10-20 11:37:24.499321"
+      ],
+      "tests": {
+        "OND.1.1.1234": {
+          "detection file path": "c:\\Users\\kaufmana\\Documents\\Sail-On\\Gitlab\\sail-on-api\\tests\\server_results_unit_tests\\OND\\transcripts\\get_feedback_transcripts.OND.1.1.1234_detection.csv",
+          "characterization file path": "c:\\Users\\kaufmana\\Documents\\Sail-On\\Gitlab\\sail-on-api\\tests\\server_results_unit_tests\\OND\\transcripts\\get_feedback_transcripts.OND.1.1.1234_characterization.csv",
+          "last round": "1",
+          "rounds": {
+            "0": {
+              "time": [
+                "2020-09-25 11:05:23.986603"
+              ]
+            },
+            "1": {
+              "time": [
+                "2020-10-20 11:37:24.499321"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "get_feedback": {
+      "time": [
+        "2020-10-14 16:40:11.457958"
+      ],
+      "tests": {
+        "OND.1.1.1234": {
+          "rounds": {
+            "1": {
+              "time": [
+                "2020-10-14 16:40:11.457958",
+                "2020-10-14 16:40:11.478922"
+              ],
+              "characterization": 1,
+              "transcription": 0
+            }
+          },
+          "last round": "1"
+        }
+      }
+    }
+  }
+}
