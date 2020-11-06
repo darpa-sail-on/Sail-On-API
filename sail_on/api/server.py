@@ -209,7 +209,7 @@ def new_session() -> Dict[str, str]:
             )
         data = json.loads(val) if type(val) is not dict else val
         protocol = data["protocol"]
-        domain = data["domain"]
+        domain = data.get("domain", "image_classification")
         novelty_version = data["novelty_detector_version"]
         hints = data.get("hints", [])
 
