@@ -613,13 +613,14 @@ def session_status() -> str:
     after = data.get("after", None)
     session_id = data.get("session_id", None)
     test_ids = data.get("test_ids", None)
+    detector = data.get("detector", None)
     if test_ids:
         test_ids = test_ids.split("|")
     include_tests = data.get("include_tests", False)
     include_tests = include_tests if type(include_tests) == bool else include_tests.lower() == 'true'
 
     try:
-        return Binder.provider.session_status(after, session_id, include_tests, test_ids).encode('utf-8')
+        return Binder.provider.session_status(after, session_id, include_tests, test_ids, detector=detector).encode('utf-8')
     except ServerError as e:
         raise e
     except ProtocolError as e:

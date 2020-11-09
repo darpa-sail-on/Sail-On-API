@@ -493,5 +493,5 @@ class TestApi(unittest.TestCase):
 
         _check_response(response)
         actual = response.content.decode("utf-8")
-        expected = "get_feedback_transcripts, OND.1.1.1234, 2020-09-25 11:05:23.986603, Incomplete\nget_feedback_transcripts, bad_test, N/A, Incomplete"
+        expected = "get_feedback_transcripts,0.1.1,OND.1.1.1234,2020-09-25 11:05:23.986603,Incomplete\nget_feedback_transcripts,0.1.1,bad_test,N/A,Incomplete"
         self.assertEqual(expected, actual)
