@@ -94,7 +94,8 @@ class Provider(ABC):
         after: str = None, 
         session_id: str = None, 
         include_tests: bool = False, 
-        test_ids:List[str] = None
+        test_ids:List[str] = None,
+        detector: str = None
     ) -> str:
         """Gets the session status"""
         pass
