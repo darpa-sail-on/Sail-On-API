@@ -803,7 +803,8 @@ class FileProvider(Provider):
         # Modify session file to indicate session has been terminated
         log_session(self.results_folder, session_id=session_id, activity="termination")
 
-    def session_status(self, after: str = None, session_id: str = None, include_tests: bool = False, test_ids:List[str] = None) -> str:
+    def session_status(self, after: str = None, session_id: str = None, include_tests: bool = False,
+                       test_ids:List[str] = None, detector: str = None) -> str:
         """
         Retrieve Session Names
         :param after: Date Time String lower
@@ -825,15 +826,18 @@ class FileProvider(Provider):
                 terminated = 'activity' in session_data and 'termination' in session_data['activity']
                 created = 'activity' in session_data and 'created' in session_data['activity']
                 if terminated:
-                    terminate_time = session_data['activity']['termination']['time']
+                    terminate_time = session_data['activity']['termination']['time'][0]
                 else:
                     terminate_time = 'Incomplete'
                 if created:
-                    creation_time = session_data['activity']['created']['time']
+                    creation_time = session_data['activity']['created']['time'][0]
                 else:
                     creation_time = 'N/A'
+                session_detector = session_data['activity']['created']['detector'] if created else None
                 session_name = os.path.splitext(os.path.basename(session_file))[0]
                 tests = session_data['activity'].get('post_results', {}).get('tests', {}) if include_tests and created else None
+                if detector is not None and detector != session_detector:
+                    continue
                 if (session_id is None and (not lower_bound or lower_bound <= parser.isoparse(terminate_time))) or session_name == session_id:
                     if include_tests:
                         if test_ids is None:
@@ -844,11 +848,11 @@ class FileProvider(Provider):
                                     creation_time = session_data['activity']['post_results']['tests'][test_id]['rounds']['0']['time'][0]
                                 else:
                                     creation_time = 'N/A'
-                                results.append(f'{session_name}, {test_id}, {creation_time}, {terminate_time}')
+                                results.append(f'{session_name},{session_detector},{test_id},{creation_time},{terminate_time}')
                         else:
-                            results.append(f'{session_name}, NA, {creation_time}, {terminate_time}')
+                            results.append(f'{session_name},{session_detector}, NA,{creation_time},{terminate_time}')
                     else:
-                        results.append(f'{session_name},{creation_time},{terminate_time}')
+                        results.append(f'{session_name},{session_detector},{creation_time},{terminate_time}')
         results = sorted(results, key=lambda x: (x.split(',')[1], x.split(',')[0]))
         return '\n'.join(results)
 
