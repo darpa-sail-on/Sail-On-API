@@ -32,7 +32,7 @@ You can either clone the public repository:
 
 .. code-block:: console
 
-    $ git clone https://gitlab.kitware.com/darpa-sail-on/sail-on.git
+    $ git clone https://storm.pargovernment.net/sail-on/sail-on-api.git
 
 Once you have a copy of the source, you can install it with:
 
@@ -41,4 +41,4 @@ Once you have a copy of the source, you can install it with:
     $ python setup.py install
 
 
-.. _Github repo: https://gitlab.kitware.com/darpa-sail-on/sail-on.git
+.. _Github repo: https://storm.pargovernment.net/sail-on/sail-on-api.git

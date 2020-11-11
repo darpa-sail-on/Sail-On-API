@@ -2,7 +2,15 @@
 PAR's TA1 API
 
 ## Setup
-1. From the sail-on-api' directory, run 'py setup.py install'
+
+Insure python3 is accessible and pipenv is ibtalled.
+
+1. From the sail-on-api' directory, run 'pipenv --python 3.7'
+2. Run 'pipenv install'
+2. Run 'pipenv shell'
+3. Run 'python setup.py install'
+
+All other commands should be run within the pipenv shell or pipenv envronment.
 
 ### Running the sail-on api
 

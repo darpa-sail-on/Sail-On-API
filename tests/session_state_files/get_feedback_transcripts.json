@@ -26,8 +26,8 @@
       ],
       "tests": {
         "OND.1.1.1234": {
-          "detection file path": "c:\\Users\\kaufmana\\Documents\\Sail-On\\Gitlab\\sail-on-api\\tests\\server_results_unit_tests\\OND\\transcripts\\get_feedback_transcripts.OND.1.1.1234_detection.csv",
-          "characterization file path": "c:\\Users\\kaufmana\\Documents\\Sail-On\\Gitlab\\sail-on-api\\tests\\server_results_unit_tests\\OND\\transcripts\\get_feedback_transcripts.OND.1.1.1234_characterization.csv",
+          "detection file path": "tests/server_results_unit_tests/OND/transcripts/get_feedback_transcripts.OND.1.1.1234_detection.csv",
+          "characterization file path": "tests/server_results_unit_tests/OND/transcripts/get_feedback_transcripts.OND.1.1.1234_characterization.csv",
           "last round": "1",
           "rounds": {
             "0": {
