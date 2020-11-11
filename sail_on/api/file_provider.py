@@ -99,10 +99,12 @@ def read_feedback_file(
         csv feedback file for the specified ids in 
         the last submitted round.
     """
+    constrained = metadata.get('feedback_constrained', True)
 
     try:
         lines = [x for x in csv_reader]
-        if is_ground_truth or round_id is not None:
+        #under the constrained case, we always look at the end of the file
+        if is_ground_truth or not constrained:
             round_pos = int(round_id) * int(metadata["round_size"]) + (1 if is_ground_truth else 0)
         else:
             round_pos = len(lines) - int(metadata["round_size"])
