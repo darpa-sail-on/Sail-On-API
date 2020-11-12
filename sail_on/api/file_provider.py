@@ -21,10 +21,10 @@ import re
 from typing import List, Optional, Dict, Any
 from csv import reader
 from io import BytesIO
+from functools import lru_cache
 
 
-
-
+@lru_cache(maxsize=64)
 def get_session_info(folder: str, session_id: str) -> Dict[str, Any]:
     """Retrieve session info."""
     path = os.path.join(folder, f"{str(session_id)}.json")
@@ -99,11 +99,13 @@ def read_feedback_file(
         csv feedback file for the specified ids in 
         the last submitted round.
     """
+    constrained = metadata.get('feedback_constrained', True)
 
     try:
         lines = [x for x in csv_reader]
-        if is_ground_truth:
-            round_pos = int(round_id) * int(metadata["round_size"]) + 1
+        #under the constrained case, we always look at the end of the file
+        if is_ground_truth or not constrained:
+            round_pos = int(round_id) * int(metadata["round_size"]) + (1 if is_ground_truth else 0)
         else:
             round_pos = len(lines) - int(metadata["round_size"])
     except KeyError:
@@ -137,7 +139,7 @@ def get_classification_feedback(
     with open(result_files[0], "r") as rf:
         detection_result_reader = csv.reader(rf, delimiter=",")
         detection_results = read_feedback_file(
-            detection_result_reader, feedback_ids, metadata, False)
+            detection_result_reader, feedback_ids, metadata, False, round_id)
 
     # if we assume monotonically increasing detection results, we can only check first. But checking all for now.
     assert all([float(v[0]) > metadata["threshold"] for (k, v) in detection_results.items(
@@ -167,7 +169,7 @@ def get_detection_feedback(
         ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
-        results = read_feedback_file(result_reader, feedback_ids, metadata, False)
+        results = read_feedback_file(result_reader, feedback_ids, metadata, False, round_id)
     
     return {
         x: 0 if abs(ground_truth[x][0] - results[x][0]) > threshold else 1
@@ -191,7 +193,7 @@ def get_characterization_feedback(
         ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
-        results = read_feedback_file(result_reader, feedback_ids, metadata, False)
+        results = read_feedback_file(result_reader, feedback_ids, metadata, False, round_id)
 
     # If ground truth is not novel, returns 1 is prediction is correct, 
     # otherwise returns 1 if prediction is not a known class
@@ -221,7 +223,7 @@ def get_levenshtein_feedback(
         ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
-        results = read_feedback_file(result_reader, feedback_ids, metadata, False)
+        results = read_feedback_file(result_reader, feedback_ids, metadata, False, round_id)
 
     return {
         x: [
@@ -247,7 +249,7 @@ def get_cluster_feedback(
         ground_truth = read_feedback_file(gt_reader, feedback_ids, metadata, True, round_id)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
-        results = read_feedback_file(result_reader, feedback_ids, metadata, False)
+        results = read_feedback_file(result_reader, feedback_ids, metadata, False, round_id)
 
     if feedback_ids is None:
         feedback_ids = ground_truth.keys()
@@ -622,11 +624,11 @@ class FileProvider(Provider):
 
         # Check to make sure the round id being requested is both the latest and the highest round submitted
         try:
-            if structure["activity"]["post_results"]["tests"][test_id]["last round"] != str(round_id):
+            if structure["activity"]["post_results"]["tests"][test_id]["last round"] != str(round_id) and metadata.get('feedback_constrained',True):
                 raise RoundError("NotLastRound", "Attempted to get feedback on an older round. Feedback can only be retrieved on the most recent round submission.")
             
             rounds_subbed = [int(r) for r in structure["activity"]["post_results"]["tests"][test_id]["rounds"].keys()]
-            if int(round_id) != max(rounds_subbed):
+            if int(round_id) != max(rounds_subbed) and  metadata.get('feedback_constrained', True):
                 raise RoundError("NotMaxRound", "Attempted to get feedback on a round that wasn't the max round submitted (most likely a resubmitted round).")
         except RoundError as e:
             raise e
@@ -757,13 +759,7 @@ class FileProvider(Provider):
             filename = f"{str(session_id)}.{str(test_id)}_{r_type}.csv"
             path = os.path.join(self.results_folder, protocol, domain, filename)
             log_content[f"{r_type} file path"] = path
-            lines = []
-            if os.path.exists(path):
-                with open(path, "r") as result_file:
-                    lines = result_file.readlines()
-            lines = [x for x in lines if x.strip("\n\t\"',.") != ""]
-            with open(path, "w") as result_file:
-                result_file.writelines(lines)
+            with open(path, "a+") as result_file:
                 result_file.write(result_files[r_type])
 
         # Log call
