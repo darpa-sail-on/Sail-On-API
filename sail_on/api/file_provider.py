@@ -101,9 +101,18 @@ def read_feedback_file(
     """
     constrained = metadata.get('feedback_constrained', True)
 
+    lines = [x for x in csv_reader]
+
+    if feedback_ids is not None and not constrained:
+        return {
+            x[0]: [n for n in x[1:]]
+            for x in
+            [[n.strip(" \"'") for n in y] for y in lines]
+            if x[0] in feedback_ids
+        }
+
     try:
-        lines = [x for x in csv_reader]
-        #under the constrained case, we always look at the end of the file
+        # under the constrained case, we always look at the end of the file
         if is_ground_truth or not constrained:
             round_pos = int(round_id) * int(metadata["round_size"]) + (1 if is_ground_truth else 0)
         else:
@@ -124,7 +133,8 @@ def read_feedback_file(
     else:
         return {
             x[0]: [n for n in x[1:]]
-            for x in [[n.strip(" \"'") for n in y] for y in lines][round_pos:round_pos + int(metadata["feedback_max_ids"])]
+            for x in
+            [[n.strip(" \"'") for n in y] for y in lines][round_pos:round_pos + int(metadata["feedback_max_ids"])]
         }
 
 def get_classification_feedback(
