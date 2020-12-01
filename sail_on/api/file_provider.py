@@ -152,8 +152,8 @@ def get_classification_feedback(
             detection_result_reader, feedback_ids, metadata, False, round_id)
 
     # if we assume monotonically increasing detection results, we can only check first. But checking all for now.
-    assert all([float(v[0]) > metadata["threshold"] for (k, v) in detection_results.items(
-    )]), "Novelty Detection score needs to be \">= threshold\" to request feedback. Discuss with TA1s to disable this."
+    if not all([float(v[0]) >= metadata["threshold"] for (k, v) in detection_results.items()]):
+        print("Novelty Detection score needs to be \">= threshold\" to request feedback. Discuss with TA1s to disable this.")
     # Read classification files
     with open(gt_file, "r") as f:
         gt_reader = csv.reader(f, delimiter=",")
