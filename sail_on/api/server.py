@@ -41,7 +41,7 @@ def init(hostname: str, port: int) -> None:
     # Note: Initializing the api will block the thread from continuing until it
     # is disabled. This should be the last call in the thread.
     if get_provider() is not None:
-        app.run(host=hostname, port=port)
+        app.run(host=hostname, port=port, threaded=True)
         logging.info(f"Api Server successfully started at {hostname}:{port}")
     else:
         raise ServerError(
