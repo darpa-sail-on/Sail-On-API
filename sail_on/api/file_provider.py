@@ -18,20 +18,53 @@ from dateutil import parser
 import zipfile
 import re
 
+from threading import RLock
 from typing import List, Optional, Dict, Any
 from csv import reader
 from io import BytesIO
-from functools import lru_cache
+from cachetools import LRUCache, Cache, cached
 
+cache_lock = RLock()
 
-@lru_cache(maxsize=64)
-def get_session_info(folder: str, session_id: str) -> Dict[str, Any]:
+class FileLRUCache(LRUCache):
+
+    def __init__(self, maxsize):
+       LRUCache.__init__(self, maxsize=maxsize)
+       self.times = {}
+
+    def __getitem__(self, key):
+        return LRUCache.__getitem__(self, key, cache_getitem=FileLRUCache._intercept_get_)
+
+    def __delitem__(self, key):
+        self.times.pop(key[0])
+        return LRUCache.__delitem__(self, key)
+
+    def __missing__(self, key):
+        mtime = os.stat(key[0]).st_mtime if os.path.exists(key[0]) else 0
+        self.times[key[0]] = mtime
+        raise KeyError(key)
+
+    def _intercept_get_(self, key):
+        item = Cache.__getitem__(self, key)
+        # does not reach here if missing key
+        mtime = os.stat(key[0]).st_mtime if os.path.exists(key[0]) else 0
+        if key[0] in self.times:
+            if self.times[key[0]] < mtime:
+               item = self.__missing__(key)
+        self.times[key[0]] = mtime
+        return item
+
+@cached(FileLRUCache(32), lock=cache_lock)
+def get_session_info_path(path: str) -> Dict[str, Any]:
     """Retrieve session info."""
-    path = os.path.join(folder, f"{str(session_id)}.json")
     if os.path.exists(path):
         with open(path, "r") as session_file:
             return json.load(session_file)
     return {}
+
+def get_session_info(folder: str, session_id: str) -> Dict[str, Any]:
+    """Retrieve session info."""
+    return get_session_info_path(os.path.join(folder, f"{str(session_id)}.json"))
 
 
 def log_session(
