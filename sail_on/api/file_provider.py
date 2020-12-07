@@ -628,7 +628,7 @@ class FileProvider(Provider):
 
         # Ensure feedback type works with session domain
         # and if so, grab the proper files
-        domain = metadata["domain"]
+        domain = structure["activity"]["created"]["domain"]
         if domain in self.feedback_request_mapping:
             try:
                 file_types = self.feedback_request_mapping[domain][feedback_type]["files"]
