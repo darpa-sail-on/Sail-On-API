@@ -54,7 +54,7 @@ class FileLRUCache(LRUCache):
         self.times[key[0]] = mtime
         return item
 
-@cached(FileLRUCache(32), lock=cache_lock)
+# @cached(FileLRUCache(32), lock=cache_lock)
 def get_session_info_path(path: str) -> Dict[str, Any]:
     """Retrieve session info."""
     if os.path.exists(path):
