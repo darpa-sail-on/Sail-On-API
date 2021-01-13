@@ -1,54 +1,8 @@
 {
-  "activity": {
-    "created": {
-      "time": "2020-04-06 11:03:00.144872",
-      "protocol": "OND",
-      "domain": "transcripts",
-      "detector": "0.1.1"
-    },
-    "data_request": {
-      "time": "2020-04-06 10:51:13.436315",
-      "tests": {
-        "OND.1.1.1234": {
-          "time": "2020-04-06 11:03:43.138616"
-        },
-        "OND.1.1.12345": {
-          "time": "2020-04-06 11:03:43.138616"
-        }
-      }
-    },
-    "get_feedback": {
-      "time": [
-        "2020-10-14 16:40:11.457958"
-      ],
-      "tests": {
-        "OND.1.1.1234": {
-          "rounds": {
-            "1": {
-              "time": [
-                "2020-10-14 16:40:11.457958",
-                "2020-10-14 16:40:11.478922"
-              ],
-              "type": "characterization"
-            }
-          },
-          "last round": "1",
-          "total count": 2
-        },
-        "OND.1.1.12345": {
-          "rounds": {
-            "1": {
-              "time": [
-                "2020-10-14 16:40:11.457958",
-                "2020-10-14 16:40:11.478922"
-              ],
-              "type": "classification"
-            }
-          },
-          "last round": "1",
-          "total count": 2
-        }
-      }
-    }
+  "created": {
+    "time": "2020-04-06 11:03:00.144872",
+    "protocol": "OND",
+    "domain": "transcripts",
+    "detector": "0.1.1"
   }
 }
