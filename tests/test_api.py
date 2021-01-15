@@ -505,6 +505,15 @@ class TestApi(unittest.TestCase):
         _check_response(response)
 
         latest = response.json()
-        self.assertEqual("OND.1.1.1234", latest["test_id"])
-        self.assertEqual("-1", latest["round_id"])
-        self.assertEqual(["OND.1.1.1234"], latest["all_tests"])
+        self.assertEqual(["OND.1.1.1234"], latest["finished_tests"])
+
+    def test_complete_test(self):
+        response = delete(
+            "/test",
+            params={
+                "session_id": "post_results",
+                "test_id": "OND.1.1.1234"
+            }
+        )
+
+        _check_response(response)

@@ -107,5 +107,10 @@ class Provider(ABC):
 
     @abstractmethod
     def latest_session_info(self, session_id: str) -> str:
-        """Return a dict with the last test and round with posted results"""
+        """Return a dict with a list of all completed tests"""
+        pass
+
+    @abstractmethod
+    def complete_test(self, session_id: str, test_id: str) -> None:
+        """Mark the given test as complete"""
         pass

@@ -9,9 +9,8 @@
     "classification": [1, 2]
   },
   "tests": {
-    "logged_tests": [
+    "completed_tests": [
 			"OND.1.1.1234"
-		],
-		"last_test": "OND.1.1.1234"
+		]
 	}
 }

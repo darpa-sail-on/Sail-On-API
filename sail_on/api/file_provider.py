@@ -80,7 +80,14 @@ def get_session_test_info(folder: str, session_id: str, test_id: str) -> Dict[st
     path = os.path.join(folder, f"{str(session_id)}.{test_id}.json")
     if os.path.exists(path):
         with open(path, "r") as session_file:
-            return json.load(session_file)
+            info = json.load(session_file)
+            if "completion" in info:
+                raise ProtocolError(
+                    "TestCompleted", 
+                    "The test being requested has already been completed for this session",
+                )
+            else:
+                return info
     return {}
 
 def log_session(
@@ -91,9 +98,11 @@ def log_session(
     round_id: Optional[int] = None,
     content: Optional[Dict[str, Any]] = None,
     content_loc: Optional[str] = "round",
-) -> None:
+    return_structure: Optional[bool] = False
+) -> Optional[Dict]:
     """Create a log files of all session activity."""
     structure = get_session_info(folder, session_id)
+    write_session_file = True
     if test_id is None:
         structure[activity] = {"time": [str(datetime.datetime.now())]}
         if content is not None:
@@ -125,18 +134,23 @@ def log_session(
             test_structure[activity]["rounds"] = rounds
             test_structure[activity]["last round"] = round_id
 
-        with open(os.path.join(folder, f"{str(session_id)}.{str(test_id)}.json"), "w") as session_file:
-            json.dump(test_structure, session_file, indent=2)
+        if not return_structure:
+            with open(os.path.join(folder, f"{str(session_id)}.{str(test_id)}.json"), "w") as session_file:
+                json.dump(test_structure, session_file, indent=2)
         
-        session_tests = structure.get("tests", {"logged_tests": []})
-        if test_id not in session_tests["logged_tests"]:
-            session_tests["logged_tests"].append(test_id)
-        session_tests["last_test"] = test_id
-        structure["tests"] = session_tests
+        if activity == "completion":    
+            session_tests = structure.get("tests", {"completed_tests": []})
+            session_tests["completed_tests"].append(test_id)
+            structure["tests"] = session_tests
+        else:
+            write_session_file = False
 
-    with open(os.path.join(folder, f"{str(session_id)}.json"), "w") as session_file:
-        json.dump(structure, session_file, indent=2)
+    if write_session_file:
+        with open(os.path.join(folder, f"{str(session_id)}.json"), "w") as session_file:
+            json.dump(structure, session_file, indent=2)
 
+    if return_structure:
+        return test_structure
 
 # region Feedback related functions
 def read_feedback_file(
@@ -505,6 +519,21 @@ class FileProvider(Provider):
         metadata = self.get_test_metadata(session_id, test_id, False)
 
         if round_id is not None:
+            # Check for removing leftover files from restarting tests within a session
+            if round_id == 0:
+                test_session_path = os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json")
+                if os.path.exists(test_session_path):
+                    os.remove(test_session_path)
+                test_result_paths = glob.glob(os.path.join(
+                    self.results_folder, 
+                    info["protocol"], 
+                    info["domain"], 
+                    f"{str(session_id)}.{str(test_id)}_*.csv"
+                ))
+                for path in test_result_paths:
+                    os.remove(path)
+
+
             temp_file_path = BytesIO()
 
             with open(file_location, "r") as f:
@@ -827,22 +856,22 @@ class FileProvider(Provider):
 
         # Log call
         log_content["last round"] = round_id
-        log_session(
+        updated_test_structure = log_session(
             self.results_folder,
             activity="post_results",
             session_id=session_id,
             test_id=test_id,
             round_id=round_id,
             content=log_content,
-            content_loc="activity"
+            content_loc="activity",
+            return_structure=True
         )
 
-        test_structure = get_session_test_info(self.results_folder, session_id, test_id)
-        prev_types = test_structure["post_results"]["rounds"][str(round_id)].get("types", [])
+        prev_types = updated_test_structure["post_results"]["rounds"][str(round_id)].get("types", [])
         new_types =  prev_types + list(result_files.keys())
-        test_structure["post_results"]["rounds"][str(round_id)]["types"] = new_types
+        updated_test_structure["post_results"]["rounds"][str(round_id)]["types"] = new_types
         with open(os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json"), "w") as session_file:
-            json.dump(test_structure, session_file, indent=2)
+            json.dump(updated_test_structure, session_file, indent=2)
 
     def evaluate(self, session_id: str, test_id: str, round_id: int) -> str:
         """Perform evaluation."""
@@ -857,6 +886,10 @@ class FileProvider(Provider):
 
         return os.path.join(self.folder, "evaluation.csv")
 
+    def complete_test(self, session_id: str, test_id: str) -> None:
+        """Mark test as completed in session logs"""
+        log_session(self.results_folder, session_id=session_id, test_id=test_id, activity="completion")
+        
     def terminate_session(self, session_id: str) -> None:
         """Terminate the session."""
         # Modify session file to indicate session has been terminated
@@ -894,7 +927,7 @@ class FileProvider(Provider):
                 creation_time = 'N/A'
             session_detector = session_data['created']['detector'] if created else None
             session_name = os.path.splitext(os.path.basename(session_file))[0]
-            tests = session_data.get('tests', {}).get('logged_tests', {}) if include_tests and created else None
+            tests = session_data.get('tests', {}).get('completed_tests', {}) if include_tests and created else None
             if detector is not None and detector != session_detector:
                 continue
             if (session_id is None and (not lower_bound or lower_bound <= parser.isoparse(terminate_time))) or session_name == session_id:
@@ -955,8 +988,5 @@ class FileProvider(Provider):
     def latest_session_info(self, session_id: str) -> str:
         structure = get_session_info(self.results_folder, session_id)
         latest = {}
-        latest["all_tests"] = structure["tests"]["logged_tests"]
-        latest["test_id"] = structure["tests"]["last_test"]
-        test_structure = get_session_test_info(self.results_folder, session_id, latest["test_id"])
-        latest["round_id"] = test_structure.get("post_results", {"last round": "-1"})["last round"]
+        latest["finished_tests"] = structure["tests"]["completed_tests"]
         return latest

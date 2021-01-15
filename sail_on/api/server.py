@@ -681,8 +681,7 @@ def get_latest_session_info() -> Response:
     Arguments:
         -session_id
     Returns:
-        -test_id
-        -round_id
+        -finished_tests
     """
 
     # Attempts to retrieve the proper variables from the API call body,
@@ -702,6 +701,43 @@ def get_latest_session_info() -> Response:
         response = Binder.provider.latest_session_info(session_id)
         logging.info(f"Returning: {response}")
         return response
+    except ServerError as e:
+        raise e
+    except ProtocolError as e:
+        raise e
+    except Exception as e:
+        raise ServerError(str(type(e)), str(e), traceback.format_exc())
+
+@app.route("/test", methods=["DELETE"])
+def complete_test() -> Response:
+    """
+    Marks the given test as completed
+
+    Arguments:
+        -session_id
+        -test_id
+    Returns:
+        -OK or error
+    """
+
+    # Attempts to retrieve the proper variables from the API call body,
+    # and passes them to the provider function
+    data = request.args
+    try:
+        session_id = data["session_id"]
+        test_id = data["test_id"]
+        logging.info(f"CompleteTest called with session_id: {session_id} and test_id: {test_id}")
+    except KeyError:
+        raise ProtocolError(
+            "MissingParamsError",
+            "Complete test requires session_id and test_id",
+            traceback.format_exc(),
+        )
+
+    try:
+        Binder.provider.complete_test(session_id, test_id)
+        logging.info("Complete Test returning 'OK'")
+        return "OK"
     except ServerError as e:
         raise e
     except ProtocolError as e:
