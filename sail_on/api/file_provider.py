@@ -90,6 +90,10 @@ def get_session_test_info(folder: str, session_id: str, test_id: str) -> Dict[st
                 return info
     return {}
 
+def write_session_log_file(structure: Dict, filepath: str) -> None:
+    with open(filepath, "w") as session_file:
+            json.dump(structure, session_file, indent=2)
+
 def log_session(
     folder: str,
     session_id: str,
@@ -135,8 +139,7 @@ def log_session(
             test_structure[activity]["last round"] = round_id
 
         if not return_structure:
-            with open(os.path.join(folder, f"{str(session_id)}.{str(test_id)}.json"), "w") as session_file:
-                json.dump(test_structure, session_file, indent=2)
+            write_session_log_file(test_structure, os.path.join(folder, f"{str(session_id)}.{str(test_id)}.json"))
         
         if activity == "completion":    
             session_tests = structure.get("tests", {"completed_tests": []})
@@ -146,8 +149,7 @@ def log_session(
             write_session_file = False
 
     if write_session_file:
-        with open(os.path.join(folder, f"{str(session_id)}.json"), "w") as session_file:
-            json.dump(structure, session_file, indent=2)
+        write_session_log_file(structure, os.path.join(folder, f"{str(session_id)}.json"))
 
     if return_structure:
         return test_structure
@@ -390,8 +392,7 @@ def psuedo_label_feedback(
         return_dict[x] = labels.index(col)
 
     structure["psuedo_labels"][feedback_type] = labels
-    with open(os.path.join(folder, f"{str(session_id)}.json"), "w") as session_file:
-        json.dump(structure, session_file, indent=2)
+    write_session_log_file(structure, os.path.join(folder, f"{str(session_id)}.json"))
 
     return return_dict
 
@@ -505,6 +506,7 @@ class FileProvider(Provider):
         """Request a dataset."""
         try:
             info = get_session_info(self.results_folder, session_id)['created']
+            test_info = get_session_test_info(self.results_folder, session_id, test_id)
             file_location = os.path.join(self.folder, info["protocol"], info["domain"], f"{test_id}_single_df.csv")
         except KeyError:
             raise ProtocolError("session_id_invalid", f"Provided session id {session_id} could not be found or was improperly set up")
@@ -520,7 +522,7 @@ class FileProvider(Provider):
 
         if round_id is not None:
             # Check for removing leftover files from restarting tests within a session
-            if round_id == 0:
+            if round_id == 0 and test_info:
                 test_session_path = os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json")
                 if os.path.exists(test_session_path):
                     os.remove(test_session_path)
@@ -870,8 +872,7 @@ class FileProvider(Provider):
         prev_types = updated_test_structure["post_results"]["rounds"][str(round_id)].get("types", [])
         new_types =  prev_types + list(result_files.keys())
         updated_test_structure["post_results"]["rounds"][str(round_id)]["types"] = new_types
-        with open(os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json"), "w") as session_file:
-            json.dump(updated_test_structure, session_file, indent=2)
+        write_session_log_file(updated_test_structure, os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json"))
 
     def evaluate(self, session_id: str, test_id: str, round_id: int) -> str:
         """Perform evaluation."""
@@ -940,7 +941,10 @@ class FileProvider(Provider):
                                 session_test_file = f"{session_file[:-5]}.{test_id}.json"
                                 with open(session_test_file, "r") as tf:
                                     test_data = json.load(tf)
-                                creation_time = test_data['post_results']['rounds']['0']['time'][0]
+                                try:
+                                    creation_time = test_data['post_results']['rounds']['0']['time'][0]
+                                except KeyError:
+                                    creation_time = "N/A"
                             else:
                                 creation_time = 'N/A'
                             results.append(f'{session_name},{session_detector},{test_id},{creation_time},{terminate_time}')
