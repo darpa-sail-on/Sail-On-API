@@ -104,3 +104,13 @@ class Provider(ABC):
     def get_session_zip(self, session_id: str, test_ids: List[str] = None) -> str:
         """Returns a zip of all files assoiated with the provided session id and any provided test ids"""
         pass
+
+    @abstractmethod
+    def latest_session_info(self, session_id: str) -> str:
+        """Return a dict with a list of all completed tests"""
+        pass
+
+    @abstractmethod
+    def complete_test(self, session_id: str, test_id: str) -> None:
+        """Mark the given test as complete"""
+        pass

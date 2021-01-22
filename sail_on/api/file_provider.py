@@ -24,48 +24,75 @@ from csv import reader
 from io import BytesIO
 from cachetools import LRUCache, Cache, cached
 
-cache_lock = RLock()
+#region Unused caching code
+# cache_lock = RLock()
 
-class FileLRUCache(LRUCache):
+# class FileLRUCache(LRUCache):
 
-    def __init__(self, maxsize):
-       LRUCache.__init__(self, maxsize=maxsize)
-       self.times = {}
+#     def __init__(self, maxsize):
+#        LRUCache.__init__(self, maxsize=maxsize)
+#        self.times = {}
 
-    def __getitem__(self, key):
-        return LRUCache.__getitem__(self, key, cache_getitem=FileLRUCache._intercept_get_)
+#     def __getitem__(self, key):
+#         return LRUCache.__getitem__(self, key, cache_getitem=FileLRUCache._intercept_get_)
 
-    def __delitem__(self, key):
-        self.times.pop(key[0])
-        return LRUCache.__delitem__(self, key)
+#     def __delitem__(self, key):
+#         self.times.pop(key[0])
+#         return LRUCache.__delitem__(self, key)
 
-    def __missing__(self, key):
-        mtime = os.stat(key[0]).st_mtime if os.path.exists(key[0]) else 0
-        self.times[key[0]] = mtime
-        raise KeyError(key)
+#     def __missing__(self, key):
+#         mtime = os.stat(key[0]).st_mtime if os.path.exists(key[0]) else 0
+#         self.times[key[0]] = mtime
+#         raise KeyError(key)
 
-    def _intercept_get_(self, key):
-        item = Cache.__getitem__(self, key)
-        # does not reach here if missing key
-        mtime = os.stat(key[0]).st_mtime if os.path.exists(key[0]) else 0
-        if key[0] in self.times:
-            if self.times[key[0]] < mtime:
-               item = self.__missing__(key)
-        self.times[key[0]] = mtime
-        return item
+#     def _intercept_get_(self, key):
+#         item = Cache.__getitem__(self, key)
+#         # does not reach here if missing key
+#         mtime = os.stat(key[0]).st_mtime if os.path.exists(key[0]) else 0
+#         if key[0] in self.times:
+#             if self.times[key[0]] < mtime:
+#                item = self.__missing__(key)
+#         self.times[key[0]] = mtime
+#         return item
+
+#endregion
 
 # @cached(FileLRUCache(32), lock=cache_lock)
 def get_session_info_path(path: str) -> Dict[str, Any]:
     """Retrieve session info."""
     if os.path.exists(path):
         with open(path, "r") as session_file:
-            return json.load(session_file)
+            info = json.load(session_file)
+            if "termination" in info:
+                raise ProtocolError(
+                    "SessionEnded", 
+                    "The session being requested has already been terminated. Please either create a new session or request a different ID",
+                )
+            else:
+                return info
     return {}
 
 def get_session_info(folder: str, session_id: str) -> Dict[str, Any]:
     """Retrieve session info."""
     return get_session_info_path(os.path.join(folder, f"{str(session_id)}.json"))
 
+def get_session_test_info(folder: str, session_id: str, test_id: str) -> Dict[str, Any]:
+    path = os.path.join(folder, f"{str(session_id)}.{test_id}.json")
+    if os.path.exists(path):
+        with open(path, "r") as session_file:
+            info = json.load(session_file)
+            if "completion" in info:
+                raise ProtocolError(
+                    "TestCompleted", 
+                    "The test being requested has already been completed for this session",
+                )
+            else:
+                return info
+    return {}
+
+def write_session_log_file(structure: Dict, filepath: str) -> None:
+    with open(filepath, "w") as session_file:
+            json.dump(structure, session_file, indent=2)
 
 def log_session(
     folder: str,
@@ -75,36 +102,32 @@ def log_session(
     round_id: Optional[int] = None,
     content: Optional[Dict[str, Any]] = None,
     content_loc: Optional[str] = "round",
-) -> None:
-    """Create a log file of all session activity."""
+    return_structure: Optional[bool] = False
+) -> Optional[Dict]:
+    """Create a log files of all session activity."""
     structure = get_session_info(folder, session_id)
-    activities = structure.get("activity", {})
+    write_session_file = True
     if test_id is None:
-        activities[activity] = {"time": [str(datetime.datetime.now())]}
+        structure[activity] = {"time": [str(datetime.datetime.now())]}
         if content is not None:
-            activities[activity].update(content)
+            structure[activity].update(content)
     else:
-        if activity not in activities:
-            activities[activity] = {"time": [str(datetime.datetime.now())]}
-        tests = activities[activity].get("tests", {})
+        test_structure = get_session_test_info(folder, session_id, test_id)
+        if activity not in test_structure:
+            test_structure[activity] = {"time": [str(datetime.datetime.now())]}
         if content_loc == "activity":
             if content is not None:
-                activities[activity].update(content)
-        if test_id not in tests:
-            tests[test_id] = {}
+                test_structure[activity].update(content)
         if round_id is None:
-            if "time" in tests[test_id]:
-                tests[test_id]["time"].append(str(datetime.datetime.now()))
+            if "time" in test_structure[activity]:
+                test_structure[activity]["time"].append(str(datetime.datetime.now()))
             else:
-                tests[test_id]["time"] = [str(datetime.datetime.now())]
+                test_structure[activity]["time"] = [str(datetime.datetime.now())]
             if content is not None:
-                tests[test_id].update(content)
+                test_structure[activity].update(content)
         else:
             round_id = str(round_id)
-            rounds = tests[test_id].get("rounds", {})
-            if content_loc == "test":
-                if content is not None:
-                    tests[test_id].update(content)
+            rounds = test_structure[activity].get("rounds", {})
             if round_id not in rounds:
                 rounds[round_id] = {"time": [str(datetime.datetime.now())]}
             else:
@@ -112,12 +135,24 @@ def log_session(
             if content_loc == "round":
                 if content is not None:
                     rounds[round_id].update(content)
-            tests[test_id]["rounds"] = rounds
-            tests[test_id]["last round"] = round_id
-        activities[activity]["tests"] = tests
-    structure["activity"] = activities
-    with open(os.path.join(folder, f"{str(session_id)}.json"), "w") as session_file:
-        json.dump(structure, session_file, indent=2)
+            test_structure[activity]["rounds"] = rounds
+            test_structure[activity]["last round"] = round_id
+
+        if not return_structure:
+            write_session_log_file(test_structure, os.path.join(folder, f"{str(session_id)}.{str(test_id)}.json"))
+        
+        if activity == "completion":    
+            session_tests = structure.get("tests", {"completed_tests": []})
+            session_tests["completed_tests"].append(test_id)
+            structure["tests"] = session_tests
+        else:
+            write_session_file = False
+
+    if write_session_file:
+        write_session_log_file(structure, os.path.join(folder, f"{str(session_id)}.json"))
+
+    if return_structure:
+        return test_structure
 
 # region Feedback related functions
 def read_feedback_file(
@@ -339,14 +374,14 @@ def psuedo_label_feedback(
 
     structure = get_session_info(folder, session_id)
 
-    if "psuedo_labels" in structure["activity"]:
-        if feedback_type in structure["activity"]["psuedo_labels"]:
-            labels = structure["activity"]["psuedo_labels"][feedback_type]
+    if "psuedo_labels" in structure:
+        if feedback_type in structure["psuedo_labels"]:
+            labels = structure["psuedo_labels"][feedback_type]
         else:
-            structure["activity"]["psuedo_labels"][feedback_type] = []
+            structure["psuedo_labels"][feedback_type] = []
             labels = []
     else:
-        structure["activity"]["psuedo_labels"] = {feedback_type: []}
+        structure["psuedo_labels"] = {feedback_type: []}
         labels = []
 
     return_dict = {}
@@ -356,9 +391,8 @@ def psuedo_label_feedback(
             labels.append(col)
         return_dict[x] = labels.index(col)
 
-    structure["activity"]["psuedo_labels"][feedback_type] = labels
-    with open(os.path.join(folder, f"{str(session_id)}.json"), "w") as session_file:
-        json.dump(structure, session_file, indent=2)
+    structure["psuedo_labels"][feedback_type] = labels
+    write_session_log_file(structure, os.path.join(folder, f"{str(session_id)}.json"))
 
     return return_dict
 
@@ -377,7 +411,8 @@ class FileProvider(Provider):
     def get_test_metadata(self, session_id: str, test_id: str, api_call: bool = True) -> Dict[str, Any]:
         """Get test metadata"""
         try:
-            info = get_session_info(self.results_folder, session_id)['activity']['created']
+            structure = get_session_info(self.results_folder, session_id)
+            info = structure['created']
             metadata_location = os.path.join(self.folder, info["protocol"], info["domain"], f"{test_id}_metadata.json")
         except KeyError:
             raise ProtocolError("session_id_invalid", f"Provided session id {session_id} could not be found or was improperly set up")
@@ -401,9 +436,7 @@ class FileProvider(Provider):
             "pre_novelty_batches"
         ]
 
-        if session_id is not None:
-            structure = get_session_info(self.results_folder, session_id)
-            hints = structure.get('activity',{}).get('created', {}).get('hints',[])
+        hints = info.get('hints',[])
 
         approved_metadata.extend([data for data in ["red_light"] if data in hints])
 
@@ -472,7 +505,8 @@ class FileProvider(Provider):
     def dataset_request(self, session_id: str, test_id: str, round_id: int) -> FileResult:
         """Request a dataset."""
         try:
-            info = get_session_info(self.results_folder, session_id)['activity']['created']
+            info = get_session_info(self.results_folder, session_id)['created']
+            test_info = get_session_test_info(self.results_folder, session_id, test_id)
             file_location = os.path.join(self.folder, info["protocol"], info["domain"], f"{test_id}_single_df.csv")
         except KeyError:
             raise ProtocolError("session_id_invalid", f"Provided session id {session_id} could not be found or was improperly set up")
@@ -487,6 +521,21 @@ class FileProvider(Provider):
         metadata = self.get_test_metadata(session_id, test_id, False)
 
         if round_id is not None:
+            # Check for removing leftover files from restarting tests within a session
+            if round_id == 0 and test_info:
+                test_session_path = os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json")
+                if os.path.exists(test_session_path):
+                    os.remove(test_session_path)
+                test_result_paths = glob.glob(os.path.join(
+                    self.results_folder, 
+                    info["protocol"], 
+                    info["domain"], 
+                    f"{str(session_id)}.{str(test_id)}_*.csv"
+                ))
+                for path in test_result_paths:
+                    os.remove(path)
+
+
             temp_file_path = BytesIO()
 
             with open(file_location, "r") as f:
@@ -607,11 +656,12 @@ class FileProvider(Provider):
         """Get feedback of the specified type"""
         metadata = self.get_test_metadata(session_id, test_id, False)
         structure = get_session_info(self.results_folder, session_id)
+        test_structure = get_session_test_info(self.results_folder, session_id, test_id)
 
         # Gets the amount of ids already requested for this type of feedback this round and 
         # determines whether the limit has alreayd been reached
         try:
-            feedback_count = structure["activity"]["get_feedback"]["tests"][test_id]["rounds"][round_id].get(feedback_type, 0)
+            feedback_count = test_structure["get_feedback"]["rounds"][round_id].get(feedback_type, 0)
             if feedback_count >= metadata["feedback_max_ids"]:
                 raise ProtocolError(
                     "FeedbackBudgetExceeded", 
@@ -628,7 +678,7 @@ class FileProvider(Provider):
 
         # Ensure feedback type works with session domain
         # and if so, grab the proper files
-        domain = structure["activity"]["created"]["domain"]
+        domain = structure["created"]["domain"]
         if domain in self.feedback_request_mapping:
             try:
                 file_types = self.feedback_request_mapping[domain][feedback_type]["files"]
@@ -667,10 +717,10 @@ class FileProvider(Provider):
 
         # Check to make sure the round id being requested is both the latest and the highest round submitted
         try:
-            if structure["activity"]["post_results"]["tests"][test_id]["last round"] != str(round_id) and metadata.get('feedback_constrained',True):
+            if test_structure["post_results"]["last round"] != str(round_id) and metadata.get('feedback_constrained',True):
                 raise RoundError("NotLastRound", "Attempted to get feedback on an older round. Feedback can only be retrieved on the most recent round submission.")
             
-            rounds_subbed = [int(r) for r in structure["activity"]["post_results"]["tests"][test_id]["rounds"].keys()]
+            rounds_subbed = [int(r) for r in test_structure["post_results"]["rounds"].keys()]
             if int(round_id) != max(rounds_subbed) and  metadata.get('feedback_constrained', True):
                 raise RoundError("NotMaxRound", "Attempted to get feedback on a round that wasn't the max round submitted (most likely a resubmitted round).")
         except RoundError as e:
@@ -684,7 +734,7 @@ class FileProvider(Provider):
 
         # If detection is required, ensure detection has been posted for the requested round and novelty claimed for the test
         if self.feedback_request_mapping[domain][feedback_type].get("detection_req", False):
-            test_log = structure["activity"]["post_results"]["tests"][test_id]
+            test_log = test_structure["post_results"]
             if "detection file path" not in test_log:
                 raise ProtocolError(
                     "DetectionPostRequired", 
@@ -783,10 +833,11 @@ class FileProvider(Provider):
     ) -> None:
         """Post results."""
         # Modify session file with posted results
-        info = get_session_info(self.results_folder, session_id)
+        structure = get_session_info(self.results_folder, session_id)
+        test_structure = get_session_test_info(self.results_folder, session_id, test_id)
         if "detection" in result_files.keys():
             try:
-                if "detection" in info["activity"]["post_results"]["tests"][test_id]["rounds"][str(round_id)]["types"]:
+                if "detection" in test_structure["post_results"]["rounds"][str(round_id)]["types"]:
                     raise ProtocolError(
                     "DetectionRepost",
                     "Cannot re post detection for a given round. If you attempted to submit any other results, please resubmit without detection."
@@ -794,8 +845,8 @@ class FileProvider(Provider):
             except KeyError:
                 pass
 
-        protocol = info["activity"]["created"]["protocol"]
-        domain = info["activity"]["created"]["domain"]
+        protocol = structure["created"]["protocol"]
+        domain = structure["created"]["domain"]
         os.makedirs(os.path.join(self.results_folder, protocol, domain), exist_ok=True)
         log_content = {}
         for r_type in result_files.keys():
@@ -807,22 +858,21 @@ class FileProvider(Provider):
 
         # Log call
         log_content["last round"] = round_id
-        log_session(
+        updated_test_structure = log_session(
             self.results_folder,
             activity="post_results",
             session_id=session_id,
             test_id=test_id,
             round_id=round_id,
             content=log_content,
-            content_loc="test"
+            content_loc="activity",
+            return_structure=True
         )
 
-        structure = get_session_info(self.results_folder, session_id)
-        prev_types = structure["activity"]["post_results"]["tests"][test_id]["rounds"][str(round_id)].get("types", [])
+        prev_types = updated_test_structure["post_results"]["rounds"][str(round_id)].get("types", [])
         new_types =  prev_types + list(result_files.keys())
-        structure["activity"]["post_results"]["tests"][test_id]["rounds"][str(round_id)]["types"] = new_types
-        with open(os.path.join(self.results_folder, f"{str(session_id)}.json"), "w") as session_file:
-            json.dump(structure, session_file, indent=2)
+        updated_test_structure["post_results"]["rounds"][str(round_id)]["types"] = new_types
+        write_session_log_file(updated_test_structure, os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json"))
 
     def evaluate(self, session_id: str, test_id: str, round_id: int) -> str:
         """Perform evaluation."""
@@ -837,6 +887,10 @@ class FileProvider(Provider):
 
         return os.path.join(self.folder, "evaluation.csv")
 
+    def complete_test(self, session_id: str, test_id: str) -> None:
+        """Mark test as completed in session logs"""
+        log_session(self.results_folder, session_id=session_id, test_id=test_id, activity="completion")
+        
     def terminate_session(self, session_id: str) -> None:
         """Terminate the session."""
         # Modify session file to indicate session has been terminated
@@ -862,36 +916,42 @@ class FileProvider(Provider):
         for session_file in session_files_locations:
             with open(session_file, 'r') as fp:
                 session_data = json.load(fp)
-                terminated = 'activity' in session_data and 'termination' in session_data['activity']
-                created = 'activity' in session_data and 'created' in session_data['activity']
-                if terminated:
-                    terminate_time = session_data['activity']['termination']['time'][0]
-                else:
-                    terminate_time = 'Incomplete'
-                if created:
-                    creation_time = session_data['activity']['created']['time'][0]
-                else:
-                    creation_time = 'N/A'
-                session_detector = session_data['activity']['created']['detector'] if created else None
-                session_name = os.path.splitext(os.path.basename(session_file))[0]
-                tests = session_data['activity'].get('post_results', {}).get('tests', {}) if include_tests and created else None
-                if detector is not None and detector != session_detector:
-                    continue
-                if (session_id is None and (not lower_bound or lower_bound <= parser.isoparse(terminate_time))) or session_name == session_id:
-                    if include_tests:
-                        if test_ids is None:
-                            test_ids = tests
-                        if tests and test_ids:
-                            for test_id in test_ids:
-                                if test_id in tests:
-                                    creation_time = session_data['activity']['post_results']['tests'][test_id]['rounds']['0']['time'][0]
-                                else:
-                                    creation_time = 'N/A'
-                                results.append(f'{session_name},{session_detector},{test_id},{creation_time},{terminate_time}')
-                        else:
-                            results.append(f'{session_name},{session_detector}, NA,{creation_time},{terminate_time}')
+            terminated = 'termination' in session_data
+            created = 'created' in session_data
+            if terminated:
+                terminate_time = session_data['termination']['time'][0]
+            else:
+                terminate_time = 'Incomplete'
+            if created:
+                creation_time = session_data['created']['time'][0]
+            else:
+                creation_time = 'N/A'
+            session_detector = session_data['created']['detector'] if created else None
+            session_name = os.path.splitext(os.path.basename(session_file))[0]
+            tests = session_data.get('tests', {}).get('completed_tests', {}) if include_tests and created else None
+            if detector is not None and detector != session_detector:
+                continue
+            if (session_id is None and (not lower_bound or lower_bound <= parser.isoparse(terminate_time))) or session_name == session_id:
+                if include_tests:
+                    if test_ids is None:
+                        test_ids = tests
+                    if tests and test_ids:
+                        for test_id in test_ids:
+                            if test_id in tests:
+                                session_test_file = f"{session_file[:-5]}.{test_id}.json"
+                                with open(session_test_file, "r") as tf:
+                                    test_data = json.load(tf)
+                                try:
+                                    creation_time = test_data['post_results']['rounds']['0']['time'][0]
+                                except KeyError:
+                                    creation_time = "N/A"
+                            else:
+                                creation_time = 'N/A'
+                            results.append(f'{session_name},{session_detector},{test_id},{creation_time},{terminate_time}')
                     else:
-                        results.append(f'{session_name},{session_detector},{creation_time},{terminate_time}')
+                        results.append(f'{session_name},{session_detector}, NA,{creation_time},{terminate_time}')
+                else:
+                    results.append(f'{session_name},{session_detector},{creation_time},{terminate_time}')
         results = sorted(results, key=lambda x: (x.split(',')[1], x.split(',')[0]))
         return '\n'.join(results)
 
@@ -913,6 +973,9 @@ class FileProvider(Provider):
                             os.path.join(self.results_folder, protocol, "**", f"{session_id}.*.csv"),
                             recursive=True,
                         )
+                        test_files.extend(glob.glob(
+                            os.path.join(self.results_folder, f"{session_id}.*.json")
+                        ))
                     else:
                         test_files = []
                         for test_id in test_ids:
@@ -920,7 +983,14 @@ class FileProvider(Provider):
                                 os.path.join(self.results_folder, protocol, "**", f"{session_id}.{test_id}*.csv"),
                                 recursive=True,
                             ))
+                            test_files.extend(os.path.join(self.results_folder, f"{session_id}.{test_id}.json"))
                     for test_file in test_files:
                         zip.write(test_file, arcname=test_file[len(self.results_folder) + 1:])
 
         return zip_file_name
+
+    def latest_session_info(self, session_id: str) -> str:
+        structure = get_session_info(self.results_folder, session_id)
+        latest = {}
+        latest["finished_tests"] = structure["tests"]["completed_tests"]
+        return latest
