@@ -628,6 +628,7 @@ def session_status() -> str:
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
+
 @app.route("/session/zip", methods=["GET"])
 def session_zip() -> str:
     """
@@ -670,6 +671,80 @@ def session_zip() -> str:
         raise e
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
+
+
+@app.route("/session/latest", methods=["GET"])
+def get_latest_session_info() -> Response:
+    """
+    Get the latest test with posted results and the round for which they were posted.
+
+    Arguments:
+        -session_id
+    Returns:
+        -finished_tests
+    """
+
+    # Attempts to retrieve the proper variables from the API call body,
+    # and passes them to the provider function
+    data = request.args
+    try:
+        session_id = data["session_id"]
+        logging.info(f"GetLatestSessionInfo called with session_id: {session_id}")
+    except KeyError:
+        raise ProtocolError(
+            "MissingParamsError",
+            "get latest session info requires session_id",
+            traceback.format_exc(),
+        )
+
+    try:
+        response = Binder.provider.latest_session_info(session_id)
+        logging.info(f"Returning: {response}")
+        return response
+    except ServerError as e:
+        raise e
+    except ProtocolError as e:
+        raise e
+    except Exception as e:
+        raise ServerError(str(type(e)), str(e), traceback.format_exc())
+
+@app.route("/test", methods=["DELETE"])
+def complete_test() -> Response:
+    """
+    Marks the given test as completed
+
+    Arguments:
+        -session_id
+        -test_id
+    Returns:
+        -OK or error
+    """
+
+    # Attempts to retrieve the proper variables from the API call body,
+    # and passes them to the provider function
+    data = request.args
+    try:
+        session_id = data["session_id"]
+        test_id = data["test_id"]
+        logging.info(f"CompleteTest called with session_id: {session_id} and test_id: {test_id}")
+    except KeyError:
+        raise ProtocolError(
+            "MissingParamsError",
+            "Complete test requires session_id and test_id",
+            traceback.format_exc(),
+        )
+
+    try:
+        Binder.provider.complete_test(session_id, test_id)
+        logging.info("Complete Test returning 'OK'")
+        return "OK"
+    except ServerError as e:
+        raise e
+    except ProtocolError as e:
+        raise e
+    except Exception as e:
+        raise ServerError(str(type(e)), str(e), traceback.format_exc())
+
 
 def main(args: argparse.Namespace) -> None:
     """Run the main application."""
