@@ -66,3 +66,22 @@ These never shared with the client via the protocol.
 
 * At no time should the same test file contents change.  It is better to create a new file with a new name.
 We want to allow the client system to pre-cache and pre-processing the test data given the URI or filename  (e.g. place in a pyTorch dataset).
+
+
+# WSGI
+
+Running with WSGI requires a configfile (python) to specify the bind port for the service AND the worker processes count:
+
+```
+import multiprocessing
+
+bind = "0.0.0.0:5000"
+workers = 1 #multiprocessing.cpu_count() * 2 + 1
+```
+
+Run wsgi in the PIPENV environment providing the config file for WSGI and the location of the test and results directories:
+
+```
+LOG_NAME=`date +"%m-%d-%Y.%H.%M"`
+pipenv run gunicorn -c gunicorn.config.py 'sail_on.wsgi:create_app(data_directory="/home/robertsone/TESTS", results_directory="/home/robertsone/RESULTS")' >> "${LOG_NAME}_unicorn_0.txt" 2>&1
+```
