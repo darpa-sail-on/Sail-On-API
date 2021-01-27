@@ -522,7 +522,7 @@ class FileProvider(Provider):
 
         if round_id is not None:
             # Check for removing leftover files from restarting tests within a session
-            if round_id == 0 and test_info:
+            if int(round_id) == 0 and test_info:
                 test_session_path = os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json")
                 if os.path.exists(test_session_path):
                     os.remove(test_session_path)
