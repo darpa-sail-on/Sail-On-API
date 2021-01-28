@@ -44,7 +44,7 @@ setup(
     test_suite="tests",
     tests_require=test_requirements,
     url="https://gitlab.kitware.com/darpa-sail-on/sail-on",
-    version="0.0.2",
+    version="0.2.1",
     zip_safe=False,
     entry_points={
         "console_scripts": [
