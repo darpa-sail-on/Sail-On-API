@@ -551,11 +551,8 @@ class FileProvider(Provider):
                         traceback.format_stack(),
                     )
                 if round_pos >= len(lines):
-                    raise RoundError(
-                        "round_id_invalid",
-                        f"Round id {str(round_id)} is out of scope for test id {test_id}. Check the metadata round_size.",
-                        traceback.format_stack(),
-                    )
+                    return None
+
                 text = ('\n'.join(lines[round_pos:round_pos + int(metadata["round_size"])]) + "\n").encode('utf-8')
                 temp_file_path.write(text)
                 temp_file_path.seek(0)

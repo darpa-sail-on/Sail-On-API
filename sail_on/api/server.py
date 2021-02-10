@@ -284,6 +284,9 @@ def dataset_request() -> Response:
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
+    if file_name is None:
+        return {"session_id": session_id, "msg": "end of test"}, 204
+
     # returns the file
     try:
         logging.info(f"Returning dataset_uris at file path: {file_name}")
