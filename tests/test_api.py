@@ -495,3 +495,25 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         expected = "get_feedback_transcripts,0.1.1,OND.1.1.1234,2020-09-25 11:05:23.986603,Incomplete\nget_feedback_transcripts,0.1.1,bad_test,N/A,Incomplete"
         self.assertEqual(expected, actual)
+
+    def test_get_session_latest(self):
+        response = get(
+            "/session/latest",
+            params={"session_id": "post_results"}
+        )
+
+        _check_response(response)
+
+        latest = response.json()
+        self.assertEqual(["OND.1.1.1234"], latest["finished_tests"])
+
+    def test_complete_test(self):
+        response = delete(
+            "/test",
+            params={
+                "session_id": "post_results",
+                "test_id": "OND.1.1.1234"
+            }
+        )
+
+        _check_response(response)
