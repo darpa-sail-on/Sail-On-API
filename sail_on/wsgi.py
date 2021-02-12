@@ -11,6 +11,7 @@ class Args:
       self.data_directory = kwargs['data_directory'] if 'data_directory' in  kwargs else './TEST'
       self.log_file = f'{os.getpid()}_wsgi.log'
       self.log_level = logging.INFO
+      self.url = kwargs.get('url','0.0.0.0:5003')
 
 def set_up(args):
     set_provider(
