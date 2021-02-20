@@ -284,6 +284,9 @@ def dataset_request() -> Response:
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
+    if file_name is None:
+        return {"session_id": session_id, "msg": "end of test"}, 204
+
     # returns the file
     try:
         logging.info(f"Returning dataset_uris at file path: {file_name}")
@@ -312,7 +315,7 @@ def get_feedback() -> Response:
     try:
         session_id = data["session_id"]
         test_id = data["test_id"]
-        round_id = data["round_id"]
+        round_id =  data.get("round_id",'last')
         feedback_types = data["feedback_type"].split("|")
         feedback_ids = data.get("feedback_ids", "")
         if feedback_ids == "":
@@ -325,14 +328,14 @@ def get_feedback() -> Response:
     except KeyError:
         raise ProtocolError(
             "MissingParamsError",
-            "GetFeedback requires feedback type(s), session_id, test_id, and round id",
+            "GetFeedback requires feedback type(s), session_id, and test_id",
             traceback.format_exc(),
         )
 
     try:
         responses = {}
         for f_type in feedback_types:
-            responses[f_type] = Binder.provider.get_feedback(feedback_ids, f_type, session_id, test_id, round_id)
+            responses[f_type] = Binder.provider.get_feedback(feedback_ids, f_type, session_id, test_id)
     except RoundError as e:
         raise e
     except ServerError as e:
@@ -450,9 +453,9 @@ def post_results_get_feedback() -> Response:
         session_id = data["session_id"]
         test_id = data["test_id"]
         round_id = data["round_id"]
-        result_types = data["result_types"].split("|")
+        result_types = data["result_types"]
         feedback_types = data.get("feedback_types", [])
-        feedback_types = feedback_types.split("|")
+        feedback_ids = data.get("feedback_ids")
         result_files = {}
         for r_type in result_types:
             result_files[r_type] = get_from_request(
@@ -481,7 +484,7 @@ def post_results_get_feedback() -> Response:
 
         responses = {}
         for f_type in feedback_types:
-            responses[f_type] = Binder.provider.get_feedback([], f_type, session_id, test_id, round_id)
+            responses[f_type] = Binder.provider.get_feedback(feedback_ids, f_type, session_id, test_id)
     except ServerError as e:
         raise e
     except ProtocolError as e:
@@ -492,7 +495,7 @@ def post_results_get_feedback() -> Response:
     # returns the file(s)
     try:
         logging.info(f"Returning feedback at file path(s): {responses}")
-        if len(result_types) > 1:
+        if len(responses) > 1:
             m = MultipartEncoder({
                 key: (
                     f"{session_id}.{test_id}.{round_id}_{key}.csv",
@@ -504,7 +507,7 @@ def post_results_get_feedback() -> Response:
             
             return Response(m.to_string(), content_type=m.content_type, status=200)
         else:
-            return send_file(responses[result_types[0]], attachment_filename=f'{session_id}.{test_id}.{round_id}_{result_types[0]}.csv', mimetype="test/csv")
+            return send_file(responses[feedback_types[0]], attachment_filename=f'{session_id}.{test_id}.{round_id}_{feedback_types[0]}.csv', mimetype="test/csv")
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
