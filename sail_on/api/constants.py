@@ -6,4 +6,7 @@ class ProtocolConstants:
     TEMPORAL = "temporal"
     SPATIAL = "spatial"
     PSUEDO_CLASSIFICATION = "psuedo_labels_classification"
-    
+    NOTIFY_AND_CONTINUE = "NOTIFY_AND_CONTINUE"
+    IGNORE = "IGNORE"
+    SKIP = "SKIP"
+    SCORE = "score"

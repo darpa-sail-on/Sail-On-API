@@ -162,6 +162,7 @@ class TestApi(unittest.TestCase):
         except errors.ApiError as e:
             self.assertEqual('InvalidFeedbackType', e.reason)
 
+
     def test_get_feedback_success_multiple_types(self):
         """Test get_feedback with multiple types."""
         feedback_types = [ProtocolConstants.CLASSIFICATION, ProtocolConstants.TRANSCRIPTION]
@@ -169,7 +170,7 @@ class TestApi(unittest.TestCase):
             "/session/feedback",
             params={
                 "feedback_type": "|".join(feedback_types),
-                "session_id": "get_feedback_transcripts",
+                "session_id": "get_feedback_transcripts_multiple",
                 "test_id": "OND.1.1.1234",
                 "round_id": 1,
             },
@@ -186,7 +187,7 @@ class TestApi(unittest.TestCase):
             }
             result_dicts.append(header_dict)
 
-        expected = ["nmi,0.0\n0,0.5\n", "n01484850_4515.JPEG,3\nn01484850_45289.JPEG,0\n"]
+        expected = ["n01484850_4515.JPEG,0\nn01484850_45289.JPEG,2\n", "n01484850_4515.JPEG,3\nn01484850_45289.JPEG,0\n"]
         actual = []
         for i, part in enumerate(multipart_data.parts):
             actual = part.content.decode("utf-8")
@@ -194,7 +195,24 @@ class TestApi(unittest.TestCase):
 
         for i, head in enumerate(result_dicts):
             self.assertEqual(feedback_types[i], head["name"])
-            self.assertEqual(f"get_feedback_transcripts.OND.1.1.1234.1_{feedback_types[i]}.csv", head["filename"])
+            self.assertEqual(f"get_feedback_transcripts_multiple.OND.1.1.1234.1_{feedback_types[i]}.csv", head["filename"])
+
+    def test_get_feedback_success_first_round(self):
+        """Test get_feedback with classification."""
+        feedback_types = [ProtocolConstants.CLASSIFICATION]
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": feedback_types[0],
+                "session_id": "get_feedback_first_time",
+                "test_id": "OND.1.1.1234",
+                "round_id": 0,
+            },
+        )
+        _check_response(response)
+        expected = "n01484850_4515.JPEG,0\nn01484850_45289.JPEG,2\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
 
     def test_get_feedback_success_classification(self):
         """Test get_feedback with classification."""
@@ -231,7 +249,7 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
-    def test_get_feedback_failure_no_round_id(self):
+    def test_get_feedback_failure_no_detection_empty(self):
         """Test get_feedback fails with no round id."""
         response = get(
             "/session/feedback",
@@ -239,7 +257,26 @@ class TestApi(unittest.TestCase):
                 "feedback_ids": "|".join(
                     ["n01484850_4515.JPEG", "n01484850_45289.JPEG"]),
                 "feedback_type": ProtocolConstants.CLASSIFICATION,
-                "session_id": "get_feedback_transcripts",
+                "session_id": "get_feedback_fail_transcripts",
+                "test_id": "OND.1.1.1234",
+            },
+        )
+
+        try:
+            _check_response(response)
+            self.assertEquals(0,len(response.content))
+        except errors.ApiError as e:
+            self.assertFalse(True, 'failed')
+
+    def test_get_feedback_failure_no_detection_warning(self):
+        """Test get_feedback fails with no round id."""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_ids": "|".join(
+                    ["n01484850_4515.JPEG", "n01484850_45289.JPEG"]),
+                "feedback_type": ProtocolConstants.CLASSIFICATION,
+                "session_id": "get_feedback_fail_image",
                 "test_id": "OND.1.1.1234",
             },
         )
@@ -247,7 +284,7 @@ class TestApi(unittest.TestCase):
         try:
             _check_response(response)
         except errors.ApiError as e:
-            self.assertEqual('MissingParamsError', e.reason)
+            self.assertFalse(True, 'failed')
 
     def test_get_feedback_success_cluster(self):
         """Test get_feedback with type classification for cluster function."""
@@ -255,14 +292,14 @@ class TestApi(unittest.TestCase):
             "/session/feedback",
             params={
                 "feedback_type": ProtocolConstants.CLASSIFICATION,
-                "session_id": "get_feedback_transcripts",
+                "session_id": "get_feedback_transcripts_cluster",
                 "test_id": "OND.1.1.1234",
                 "round_id": 1,
             },
         )
 
         _check_response(response)
-        expected = "nmi,0.0\n0,0.5\n"
+        expected = "n01484850_4515.JPEG,0\nn01484850_45289.JPEG,2\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
@@ -291,7 +328,7 @@ class TestApi(unittest.TestCase):
                 "feedback_ids": "|".join(
                     ["n01484850_4515.JPEG", "n01484850_45289.JPEG", "404_id.JPEG"]),
                 "feedback_type": ProtocolConstants.TRANSCRIPTION,
-                "session_id": "get_feedback_transcripts",
+                "session_id": "get_feedback_transcripts_max",
                 "test_id": "OND.1.1.1234",
                 "round_id": 1,
             },
@@ -302,7 +339,7 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
-    def test_get_feedback_psuedo_classification(self):
+    def noused_test_get_feedback_psuedo_classification(self):
         """Test getting psuedo labels for given ids"""
         response = get(
             "/session/feedback",
@@ -331,7 +368,7 @@ class TestApi(unittest.TestCase):
         }
 
         payload = {
-            "session_id": "post_results",
+            "session_id": "post_results_success_with_round_id",
             "test_id": "OND.1.1.1234",
             "round_id": 0,
             "result_types": "|".join(result_files.keys())
@@ -354,7 +391,7 @@ class TestApi(unittest.TestCase):
         }
 
         payload = {
-            "session_id": "post_results",
+            "session_id": "post_results_success_with_round_id",
             "test_id": "OND.1.1.1234",
             "round_id": 0,
             "result_types": "|".join(result_files.keys())
@@ -390,7 +427,7 @@ class TestApi(unittest.TestCase):
         }
 
         payload = {
-            "session_id": "post_results",
+            "session_id": "post_results_failure_without_roundid",
             "test_id": "OND.1.1.1234",
             "result_types": "|".join(result_files.keys())
         }
@@ -420,7 +457,7 @@ class TestApi(unittest.TestCase):
         }
 
         payload = {
-            "session_id": "post_results",
+            "session_id": "post_results_with_two_files",
             "test_id": "OND.1.1.1234",
             "round_id": 0,
             "result_types": "|".join(result_files.keys())
@@ -435,6 +472,50 @@ class TestApi(unittest.TestCase):
         response = post("/session/results", files=files)
 
         _check_response(response)
+
+    def test_post_results_success_with_two_files_and_feedback(self):
+        """Test posting results with two files."""
+        result_files = {
+            ProtocolConstants.DETECTION: os.path.join(
+                os.path.dirname(__file__), "test_results_OND.1.1.1234.csv"
+            ),
+            ProtocolConstants.CLASSIFICATION: os.path.join(
+                os.path.dirname(__file__), "test_results_OND.1.1.1234.csv"
+            ),
+        }
+
+        payload = {
+            "session_id": "post_results_with_two_files_feedback",
+            "test_id": "OND.1.1.1234",
+            "round_id": 0,
+            "result_types": list(result_files.keys()),
+            "feedback_types": [ProtocolConstants.CLASSIFICATION, ProtocolConstants.SCORE],
+            "feedback_ids": ['n01484850_4515.JPEG']
+        }
+
+        files = {"test_identification": io.StringIO(json.dumps(payload))}
+        for r_type in result_files:
+            with open(result_files[r_type], "r") as f:
+                contents = f.read()
+                files[f"{r_type}_file"] = io.StringIO(contents)
+
+        response = post("/session/resultsfeedback", files=files)
+
+        _check_response(response)
+        multipart_data = decoder.MultipartDecoder.from_response(response)
+        filenames = {}
+        for i in range(len(result_files)):
+            if len(multipart_data.parts[i].content) > 0:
+                header = multipart_data.parts[i].headers[b"Content-Disposition"].decode("utf-8")
+                header_dict = {
+                    x[0].strip(): x[1].strip(" \"'")
+                    for x in [part.split("=") for part in header.split(";") if "=" in part]
+                }
+                filenames[payload["feedback_types"][i]]=  (header_dict["filename"], len(multipart_data.parts[i].content))
+
+        self.assertTrue(filenames[ProtocolConstants.SCORE][1] > 1)
+        self.assertTrue(filenames[ProtocolConstants.CLASSIFICATION][1] > 1)
+
 
     # Evaluation Tests
     def test_evaluate_success_with_round_id(self):
@@ -499,7 +580,7 @@ class TestApi(unittest.TestCase):
     def test_get_session_latest(self):
         response = get(
             "/session/latest",
-            params={"session_id": "post_results"}
+            params={"session_id": "post_results_latest"}
         )
 
         _check_response(response)
