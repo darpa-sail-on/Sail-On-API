@@ -551,21 +551,21 @@ class FileProvider(Provider):
                 "function": get_classification_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [4],
-                "detection_req": ProtocolConstants.SKIP,
+                "detection_req": ProtocolConstants.REQUIRED,
                 "budgeted_feedback": True
             },
             ProtocolConstants.TRANSCRIPTION: {
                 "function": get_levenshtein_feedback,
                 "files": [ProtocolConstants.TRANSCRIPTION],
                 "columns": [0],
-                "detection_req": ProtocolConstants.SKIP,
+                "detection_req": ProtocolConstants.REQUIRED,
                 "budgeted_feedback": True
             },
             ProtocolConstants.SCORE: {
                 "function": get_classificaton_score_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [4],
-                "detection_req": ProtocolConstants.SKIP,
+                "detection_req": ProtocolConstants.REQUIRED,
                 "budgeted_feedback": False
             }
         },
@@ -574,14 +574,14 @@ class FileProvider(Provider):
                 "function": get_classification_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [2],
-                "detection_req": ProtocolConstants.SKIP,
+                "detection_req": ProtocolConstants.REQUIRED,
                 "budgeted_feedback": True
             },
             ProtocolConstants.SCORE: {
                 "function": get_classificaton_score_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [2],
-                "detection_req": ProtocolConstants.SKIP,
+                "detection_req": ProtocolConstants.REQUIRED,
                 "budgeted_feedback": False
             }
         }
@@ -694,7 +694,8 @@ class FileProvider(Provider):
                              "NoveltyDetectionRequired",
                              f"In order to request {feedback_type} for domain {domain}, novelty must be declared for the test"
                          )
-
+                except ProtocolError as e:
+                    raise e
                 except Exception as e:
                     raise ServerError(
                         "CantReadFile", 
