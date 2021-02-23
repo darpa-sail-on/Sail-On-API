@@ -265,8 +265,11 @@ class TestApi(unittest.TestCase):
 
         try:
             _check_response(response)
-        except errors.ApiError as e:
-            self.assertEqual("NoveltyDetectionRequired", e.reason)
+            self.assertEquals(0,len(response.content))
+        except errors.ApiError:
+            self.assertFalse(True, 'failed')
+        # except errors.ApiError as e:
+        #     self.assertEqual("NoveltyDetectionRequired", e.reason)
 
     def test_get_feedback_failure_no_detection_warning(self):
         """Test get_feedback fails with no round id."""

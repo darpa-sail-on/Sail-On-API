@@ -551,21 +551,21 @@ class FileProvider(Provider):
                 "function": get_classification_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [4],
-                "detection_req": ProtocolConstants.REQUIRED,
+                "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True
             },
             ProtocolConstants.TRANSCRIPTION: {
                 "function": get_levenshtein_feedback,
                 "files": [ProtocolConstants.TRANSCRIPTION],
                 "columns": [0],
-                "detection_req": ProtocolConstants.REQUIRED,
+                "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True
             },
             ProtocolConstants.SCORE: {
                 "function": get_classificaton_score_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [4],
-                "detection_req": ProtocolConstants.REQUIRED,
+                "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": False
             }
         },
@@ -574,14 +574,14 @@ class FileProvider(Provider):
                 "function": get_classification_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [2],
-                "detection_req": ProtocolConstants.REQUIRED,
+                "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True
             },
             ProtocolConstants.SCORE: {
                 "function": get_classificaton_score_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [2],
-                "detection_req": ProtocolConstants.REQUIRED,
+                "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": False
             }
         }
@@ -624,8 +624,7 @@ class FileProvider(Provider):
         try:
             # Gets the amount of ids already requested for this type of feedback this round and
             # determines whether the limit has already been reached
-            feedback_round_id = str(
-                max([int(r) for r in test_structure["get_feedback"]["rounds"].keys()]))
+            feedback_round_id = str(max([int(r) for r in test_structure["post_results"]["rounds"].keys()]))
 
             feedback_count = test_structure["get_feedback"]["rounds"][feedback_round_id].get(feedback_type, 0)
             if feedback_count >= metadata["feedback_max_ids"]:
@@ -685,7 +684,6 @@ class FileProvider(Provider):
                     # TODO...PAR needs 'any'.   UMD needs 'all'???
                     if max(values) <= structure["created"]["detection_threshold"] and not is_given:
                         if detection_requirement == ProtocolConstants.NOTIFY_AND_CONTINUE:
-                            #TODO: This doesnt return anything to the cient?
                             logging.error("Inform TA2 team that they are requesting feedback prior to the threshold indication")
                         elif detection_requirement == ProtocolConstants.SKIP:
                              return BytesIO()
