@@ -34,7 +34,12 @@ class Provider(ABC):
 
     @abstractmethod
     def new_session(
-        self, test_ids: List[str], protocol: str, novelty_detector_version: str, hints: List[str]
+        self, 
+        test_ids: List[str], 
+        protocol: str, 
+        novelty_detector_version: str, 
+        hints: List[str], 
+        detection_threshold: float
     ) -> str:
         """Create a new session."""
         pass

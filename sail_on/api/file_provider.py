@@ -203,8 +203,16 @@ def get_classificaton_score_feedback(
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, None, metadata, check_constrained=False)
 
-    # TBD
-    return {'accuracy' : 0}
+    # Go through results and count number correct
+    num_correct = 0
+    for id in results.keys():
+        r = int(np.argmax([float(i) for i in results[id]], axis=0))
+        g = int(ground_truth[id][metadata["columns"][0]])
+        if r == g:
+            num_correct += 1
+    
+    accuracy = float(num_correct) / float(len(results.keys()))
+    return {'accuracy' : accuracy}
 
 def get_characterization_feedback(
         gt_file: str,
@@ -411,7 +419,13 @@ class FileProvider(Provider):
         return {"test_ids": file_location, "generator_seed": "1234"}
 
     def new_session(
-        self, test_ids: List[str], protocol: str, domain: str, novelty_detector_version: str, hints: List[str]
+        self, 
+        test_ids: List[str], 
+        protocol: str, 
+        domain: str, 
+        novelty_detector_version: str, 
+        hints: List[str],
+        detection_threshold: float
     ) -> str:
         """Create a session."""
         # Verify's that all given test id's are valid and have associated csv files
@@ -434,6 +448,7 @@ class FileProvider(Provider):
                 "protocol": protocol,
                 "domain": domain,
                 "detector": novelty_detector_version,
+                "detection_threshold": detection_threshold,
                 "hints": hints
             },
         )
@@ -609,8 +624,7 @@ class FileProvider(Provider):
         try:
             # Gets the amount of ids already requested for this type of feedback this round and
             # determines whether the limit has already been reached
-            feedback_round_id = str(
-                max([int(r) for r in test_structure["get_feedback"]["rounds"].keys()]))
+            feedback_round_id = str(max([int(r) for r in test_structure["post_results"]["rounds"].keys()]))
 
             feedback_count = test_structure["get_feedback"]["rounds"][feedback_round_id].get(feedback_type, 0)
             if feedback_count >= metadata["feedback_max_ids"]:
@@ -650,24 +664,25 @@ class FileProvider(Provider):
 
         detection_requirement = feedback_definition.get("detection_req", ProtocolConstants.IGNORE)
 
-        # If detection is required, ensure detection has been posted for the requested round and novelty claimed for the test
+        # If novelty detection is required, ensure detection has been posted 
+        # for the requested round and novelty claimed for the test
         if detection_requirement != ProtocolConstants.IGNORE:
-            test_log = test_structure["post_results"]
-            if "detection file path" not in test_log:
+            test_results_structure = test_structure["post_results"]
+            if "detection file path" not in test_results_structure:
                 raise ProtocolError(
                     "DetectionPostRequired", 
                     "A detection file is required to be posted before feedback can be requested on a round. Please submit Detection results before requesting feedback"
                 )
             else:
                 try:
-                    with open(test_log["detection file path"], "r") as d_file:
+                    with open(test_results_structure["detection file path"], "r") as d_file:
                         d_reader = csv.reader(d_file, delimiter=",")
                         detection_lines = [x for x in d_reader]
                     values = [float(x[1]) for x in detection_lines]
                     # if given detection and past the detection point
                     is_given = 'red_light' in structure.get('hints',[]) and metadata.get('red_light') in [x[0] for x in detection_lines]
                     # TODO...PAR needs 'any'.   UMD needs 'all'???
-                    if max(values) <= metadata["threshold"] and not is_given:
+                    if max(values) <= structure["created"]["detection_threshold"] and not is_given:
                         if detection_requirement == ProtocolConstants.NOTIFY_AND_CONTINUE:
                             logging.error("Inform TA2 team that they are requesting feedback prior to the threshold indication")
                         elif detection_requirement == ProtocolConstants.SKIP:
@@ -677,15 +692,16 @@ class FileProvider(Provider):
                              "NoveltyDetectionRequired",
                              f"In order to request {feedback_type} for domain {domain}, novelty must be declared for the test"
                          )
-
+                except ProtocolError as e:
+                    raise e
                 except Exception as e:
                     raise ServerError(
                         "CantReadFile", 
-                        f"Couldnt open the logged detection file at {test_log['detection file path']}. Please check if the file exists and that {session_id}.json has the proper file location for test id {test_id}",
+                        f"Couldnt open the logged detection file at {test_results_structure['detection file path']}. Please check if the file exists and that {session_id}.json has the proper file location for test id {test_id}",
                         traceback.format_exc()
                     )
 
-        # Add cluster columns to metadata for use in cluster based feedback
+        # Add columns to metadata for use in feedback
         metadata["columns"] = feedback_definition.get("columns", [])
 
         # Get feedback from specified test
