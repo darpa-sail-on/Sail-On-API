@@ -112,6 +112,7 @@ class TestApi(unittest.TestCase):
             "protocol": "OND",
             "domain": "transcripts",
             "novelty_detector_version": "0.1.1",
+            "detection_threshold": 0.2
         }
 
         with open(path, "r") as f:
@@ -250,7 +251,7 @@ class TestApi(unittest.TestCase):
         self.assertEqual(expected, actual)
 
     def test_get_feedback_failure_no_detection_empty(self):
-        """Test get_feedback fails with no round id."""
+        """Test get_feedback fails with no posted detection"""
         response = get(
             "/session/feedback",
             params={
@@ -265,8 +266,10 @@ class TestApi(unittest.TestCase):
         try:
             _check_response(response)
             self.assertEquals(0,len(response.content))
-        except errors.ApiError as e:
+        except errors.ApiError:
             self.assertFalse(True, 'failed')
+        # except errors.ApiError as e:
+        #     self.assertEqual("NoveltyDetectionRequired", e.reason)
 
     def test_get_feedback_failure_no_detection_warning(self):
         """Test get_feedback fails with no round id."""
@@ -336,6 +339,23 @@ class TestApi(unittest.TestCase):
 
         _check_response(response)
         expected = "n01484850_4515.JPEG,3\nn01484850_45289.JPEG,0\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
+    def test_get_feedback_acuracy(self):
+        """Test get_feedback with type score for cumulative accuracy."""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": ProtocolConstants.SCORE,
+                "session_id": "get_feedback_transcripts",
+                "test_id": "OND.1.1.1234",
+                "round_id": 1,
+            },
+        )
+
+        _check_response(response)
+        expected = "accuracy,0.25\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 

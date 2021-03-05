@@ -193,6 +193,8 @@ def new_session() -> Dict[str, str]:
         -protocol
         -domain
         -novelty_detector_version
+        -hints
+        -detection_threshold
     Returns:
         -session_id
     """
@@ -212,6 +214,7 @@ def new_session() -> Dict[str, str]:
         domain = data.get("domain", "image_classification")
         novelty_version = data["novelty_detector_version"]
         hints = data.get("hints", [])
+        detection_threshold = data["detection_threshold"]
 
         if "test_ids" in data:
             test_ids = data['test_ids']
@@ -219,12 +222,12 @@ def new_session() -> Dict[str, str]:
             reader = request.files["test_ids"].read().decode("utf-8").split("\n")
             test_ids = [x.strip(" \"',") for x in filter(lambda x: x != "", reader)]
         logging.info(
-            f"NewSession called with test_ids: {test_ids} protocol: {protocol} domain: {domain} novelty_detector_version: {novelty_version}"  # noqa: E501
+            f"NewSession called with test_ids: {test_ids} protocol: {protocol} domain: {domain} novelty_detector_version: {novelty_version} hints: {hints} detection_threshold: {detection_threshold}"  # noqa: E501
         )
     except KeyError:
         raise ProtocolError(
             "MissingParamsError",
-            "NewSession requires test_ids, protocol, domain, and novelty_detector_version",
+            "NewSession requires test_ids, protocol, domain, and novelty_detector_version, and detection_threshold",
             traceback.format_exc(),
         )
 
@@ -232,7 +235,7 @@ def new_session() -> Dict[str, str]:
         raise ProtocolError("EmptyFile", "Select Test Ids is missing")
 
     try:
-        response = Binder.provider.new_session(test_ids, protocol, domain, novelty_version, hints)
+        response = Binder.provider.new_session(test_ids, protocol, domain, novelty_version, hints, detection_threshold)
 
         logging.info(f"Returning session_id: {response}")
         return {"session_id": response}

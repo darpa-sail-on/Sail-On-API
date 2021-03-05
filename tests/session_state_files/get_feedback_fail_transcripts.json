@@ -3,7 +3,8 @@
     "time": "2020-04-06 11:03:00.144872",
     "protocol": "OND",
     "domain": "transcripts",
-    "detector": "0.1.1"
+    "detector": "0.1.1",
+    "detection_threshold": 0.1
   },
   "psuedo_labels": {
     "classification": [1, 2]
