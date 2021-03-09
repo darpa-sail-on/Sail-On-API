@@ -184,7 +184,8 @@ def get_classification_feedback(
     """Calculates and returns the proper feedback for classification type feedback"""
 
     # Read classification files
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     # TODO: this should be min of the maximum class label permitted (K+1)
     return {x: ground_truth[x][metadata["columns"][0]] for x in ground_truth.keys()}
@@ -225,10 +226,11 @@ def get_characterization_feedback(
     raise NameError('Characterization Feedback is not supported.')
     known_classes = int(metadata["known_classes"]) + 1
 
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata, check_constrained=False)
+
 
     # If ground truth is not novel, returns 1 is prediction is correct, 
     # otherwise returns 1 if prediction is not a known class
@@ -252,7 +254,7 @@ def get_levenshtein_feedback(
         metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for levenshtein type feedback"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata)
@@ -265,7 +267,7 @@ def get_levenshtein_feedback(
             ) 
             for i,_ in enumerate(metadata["columns"])
         ]
-        for x in ground_truth.keys()
+        for x in results.keys()
     }
 
 def get_cluster_feedback(
@@ -275,7 +277,7 @@ def get_cluster_feedback(
         metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for cluster type feedback"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata)
