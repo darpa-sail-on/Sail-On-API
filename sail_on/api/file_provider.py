@@ -183,11 +183,20 @@ def get_classification_feedback(
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for classification type feedback"""
 
-    # Read classification files
+
+    if (feedback_ids is None or len(feedback_ids) == 0):
+        # if feedback ids not provided, limit to those in the last round
+        with open(result_files[0], "r") as rf:
+            result_reader = csv.reader(rf, delimiter=",")
+            results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
+            feedback_max_ids = min(metadata.get('feedback_max_ids',len(results)),len(results))
+            feedback_ids = list(results.keys())[:feedback_max_ids]
+
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     # TODO: this should be min of the maximum class label permitted (K+1)
+    # add to meta the unknown label ...FIX....
     return {x: ground_truth[x][metadata["columns"][0]] for x in ground_truth.keys()}
 
 
@@ -641,7 +650,7 @@ class FileProvider(Provider):
         left_over_ids = metadata.get("feedback_max_ids",0) - feedback_count
         if left_over_ids and feedback_ids is not None:
             if len(feedback_ids) > left_over_ids:
-                feedback_ids = feedback_ids[0:left_over_ids]
+                feedback_ids = feedback_ids[0:max(0,left_over_ids)]
 
 
         ground_truth_file = os.path.join(self.folder, metadata["protocol"], domain, f"{test_id}_single_df.csv")
@@ -680,20 +689,21 @@ class FileProvider(Provider):
                     with open(test_results_structure["detection file path"], "r") as d_file:
                         d_reader = csv.reader(d_file, delimiter=",")
                         detection_lines = [x for x in d_reader]
-                    values = [float(x[1]) for x in detection_lines]
+                    predictions = [float(x[1]) for x in detection_lines]
                     # if given detection and past the detection point
                     is_given = 'red_light' in structure.get('hints',[]) and metadata.get('red_light') in [x[0] for x in detection_lines]
-                    # TODO...PAR needs 'any'.   UMD needs 'all'???
-                    if max(values) <= structure["created"]["detection_threshold"] and not is_given:
+                    if max(predictions) <= structure["created"]["detection_threshold"] and not is_given:
                         if detection_requirement == ProtocolConstants.NOTIFY_AND_CONTINUE:
                             logging.error("Inform TA2 team that they are requesting feedback prior to the threshold indication")
                         elif detection_requirement == ProtocolConstants.SKIP:
-                             return BytesIO()
+                            logging.warning(
+                                "Inform TA2 team that they are requesting feedback prior to the threshold indication")
+                            return BytesIO()
                         else:
-                           raise ProtocolError(
+                            raise ProtocolError(
                              "NoveltyDetectionRequired",
                              f"In order to request {feedback_type} for domain {domain}, novelty must be declared for the test"
-                         )
+                            )
                 except ProtocolError as e:
                     raise e
                 except Exception as e:
