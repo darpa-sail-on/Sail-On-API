@@ -195,9 +195,10 @@ def get_classification_feedback(
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
-    # TODO: this should be min of the maximum class label permitted (K+1)
-    # add to meta the unknown label ...FIX....
-    return {x: ground_truth[x][metadata["columns"][0]] for x in ground_truth.keys()}
+    return {
+        x: min(int(ground_truth[x][metadata["columns"][0]]), metadata["known_classes"]) 
+        for x in ground_truth.keys()
+    }
 
 
 def get_classificaton_score_feedback(
@@ -206,7 +207,7 @@ def get_classificaton_score_feedback(
         feedback_ids: List[str],
         metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """Calculates and returns the proper feedback for characterization type feedback"""
+    """Calculates and returns feedback on the accuracy of classification"""
 
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file), None, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
