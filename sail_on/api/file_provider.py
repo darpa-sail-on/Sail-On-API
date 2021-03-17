@@ -183,7 +183,15 @@ def get_classification_feedback(
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for classification type feedback"""
 
-    # Read classification files
+
+    if (feedback_ids is None or len(feedback_ids) == 0):
+        # if feedback ids not provided, limit to those in the last round
+        with open(result_files[0], "r") as rf:
+            result_reader = csv.reader(rf, delimiter=",")
+            results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
+            feedback_max_ids = min(metadata.get('feedback_max_ids',len(results)),len(results))
+            feedback_ids = list(results.keys())[:feedback_max_ids]
+
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
@@ -640,11 +648,6 @@ class FileProvider(Provider):
             feedback_round_id = 0
             feedback_count = 0
 
-        left_over_ids = metadata.get("feedback_max_ids",0) - feedback_count
-        if left_over_ids and feedback_ids is not None:
-            if len(feedback_ids) > left_over_ids:
-                feedback_ids = feedback_ids[0:left_over_ids]
-
 
         ground_truth_file = os.path.join(self.folder, metadata["protocol"], domain, f"{test_id}_single_df.csv")
 
@@ -682,20 +685,21 @@ class FileProvider(Provider):
                     with open(test_results_structure["detection file path"], "r") as d_file:
                         d_reader = csv.reader(d_file, delimiter=",")
                         detection_lines = [x for x in d_reader]
-                    values = [float(x[1]) for x in detection_lines]
+                    predictions = [float(x[1]) for x in detection_lines]
                     # if given detection and past the detection point
                     is_given = 'red_light' in structure.get('hints',[]) and metadata.get('red_light') in [x[0] for x in detection_lines]
-                    # TODO...PAR needs 'any'.   UMD needs 'all'???
-                    if max(values) <= structure["created"]["detection_threshold"] and not is_given:
+                    if max(predictions) <= structure["created"]["detection_threshold"] and not is_given:
                         if detection_requirement == ProtocolConstants.NOTIFY_AND_CONTINUE:
                             logging.error("Inform TA2 team that they are requesting feedback prior to the threshold indication")
                         elif detection_requirement == ProtocolConstants.SKIP:
-                             return BytesIO()
+                            logging.warning(
+                                "Inform TA2 team that they are requesting feedback prior to the threshold indication")
+                            return BytesIO()
                         else:
-                           raise ProtocolError(
+                            raise ProtocolError(
                              "NoveltyDetectionRequired",
                              f"In order to request {feedback_type} for domain {domain}, novelty must be declared for the test"
-                         )
+                            )
                 except ProtocolError as e:
                     raise e
                 except Exception as e:
@@ -733,11 +737,14 @@ class FileProvider(Provider):
                 traceback.format_exc()
             )
 
+        number_of_ids_to_return = len(feedback)
+
+        # if budgeted, decrement use and check if too many has been requested
         if feedback_definition['budgeted_feedback']:
-            if feedback_ids is not None:
-                feedback_count += len(feedback_ids)
-            else:
-                feedback_count += len(feedback.keys())
+            left_over_ids = metadata.get("feedback_max_ids", 0) - feedback_count
+            number_of_ids_to_return = min(number_of_ids_to_return, left_over_ids)
+        feedback_count+=number_of_ids_to_return
+
 
         log_session(
             self.results_folder,
@@ -754,6 +761,10 @@ class FileProvider(Provider):
                 feedback_csv.write(f"{key},{feedback[key]}\n".encode('utf-8'))
             else:
                 feedback_csv.write(f"{key},{','.join(str(x) for x in feedback[key])}\n".encode('utf-8'))
+            number_of_ids_to_return-=1
+            # once maximium requested number is hit, quit
+            if number_of_ids_to_return == 0:
+                break
 
         feedback_csv.seek(0)
 
