@@ -350,7 +350,7 @@ def get_feedback() -> Response:
 
     # returns the file(s)
     try:
-        logging.info(f"Returning feedback at file path(s): {responses}")
+        logging.info(f"Returning feedback at file(s)")
         if len(feedback_types) > 1:
             m = MultipartEncoder({
                 key: (
@@ -522,7 +522,6 @@ def evaluate() -> Response:
     Arguments:
         -session_id
         -test_id
-        -round_id (Optional)
     Returns:
         -filename
     """
@@ -533,24 +532,22 @@ def evaluate() -> Response:
     try:
         session_id = data["session_id"]
         test_id = data["test_id"]
-        round_id = data.get("round_id")
         logging.info(
-            f"Evaluate called with session_id: {session_id} test_id: {test_id} round_id: {round_id}"  # noqa: E501
+            f"Evaluate called with session_id: {session_id} test_id: {test_id}"  # noqa: E501
         )
     except KeyError:
         raise ProtocolError(
             "MissingParamsError",
-            "Evaluate requires session_id, test_id, and round_id",
+            "Evaluate requires session_id and test_id",
             traceback.format_exc(),
         )
 
     try:
-        file_path = Binder.provider.evaluate(session_id, test_id, round_id)
-        logging.info(f"Returning file at {file_path}")
+        response = Binder.provider.evaluate(session_id, test_id)
+        logging.info(f"Returning eval file")
         return send_file(
-            file_path,
-            attachment_filename="evaluation.{}.{}.csv".format(session_id, test_id),
-            as_attachment=True,
+            response,
+            attachment_filename=f"evaluation.{session_id}.{test_id}.csv",
             mimetype="test/csv",
         )
     except ServerError as e:
