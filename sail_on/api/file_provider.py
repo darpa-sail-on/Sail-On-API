@@ -825,7 +825,7 @@ class FileProvider(Provider):
         updated_test_structure["post_results"]["rounds"][str(round_id)]["types"] = new_types
         write_session_log_file(updated_test_structure, os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json"))
 
-    def evaluate(self, session_id: str, test_id: str) -> BytesIO:
+    def evaluate(self, session_id: str, test_id: str) -> Dict:
         """Perform Kitware developed evaluation code modifed to work in this API"""
         
         structure = get_session_info(self.results_folder, session_id)
@@ -836,23 +836,23 @@ class FileProvider(Provider):
         results = {}
         metadata = self.get_test_metadata(session_id, test_id, False)
 
+        detection_file_path = os.path.join(
+            self.results_folder,
+            protocol,
+            domain,
+            f"{session_id}.{test_id}_detection.csv",
+        )
+        detections = pd.read_csv(detection_file_path, sep=",", header=None)
+        classification_file_path = os.path.join(
+            self.results_folder,
+            protocol,
+            domain,
+            f"{session_id}.{test_id}_classification.csv",
+        )
+        classifications = pd.read_csv(classification_file_path, sep=",", header=None)
+
         # Image Classification Evaluation
         if domain == "image_classification":
-            detection_file_path = os.path.join(
-                self.results_folder,
-                protocol,
-                domain,
-                f"{session_id}.{test_id}_detection.csv",
-            )
-            detections = pd.read_csv(detection_file_path, sep=",", header=None)
-            classification_file_path = os.path.join(
-                self.results_folder,
-                protocol,
-                domain,
-                f"{session_id}.{test_id}_classification.csv",
-            )
-
-            classifications = pd.read_csv(classification_file_path, sep=",", header=None)
             arm_im = ImageClassificationMetrics(
                 protocol, 
                 **{"image_id": 0, "detection": 1, "classification": 2}
@@ -894,20 +894,6 @@ class FileProvider(Provider):
 
         # Activity Recognition Evaluation
         elif domain == "activity_recognition":
-            detection_file_path = os.path.join(
-                self.results_folder,
-                protocol,
-                domain,
-                f"{session_id}.{test_id}_detection.csv",
-            )
-            detections = pd.read_csv(detection_file_path, sep=",", header=None)
-            classification_file_path = os.path.join(
-                self.results_folder,
-                protocol,
-                domain,
-                f"{session_id}.{test_id}_classification.csv",
-            )
-            classifications = pd.read_csv(classification_file_path, sep=",", header=None)
             arm_ar = ActivityRecognitionMetrics(
                 protocol, 
                 **{
@@ -956,20 +942,6 @@ class FileProvider(Provider):
 
         # Document Transcript Evaluation
         elif domain == "transcripts":
-            detection_file_path = os.path.join(
-                self.results_folder,
-                protocol,
-                domain,
-                f"{session_id}.{test_id}_detection.csv",
-            )
-            detections = pd.read_csv(detection_file_path, sep=",", header=None)
-            classification_file_path = os.path.join(
-                self.results_folder,
-                protocol,
-                domain,
-                f"{session_id}.{test_id}_classification.csv",
-            )
-            classifications = pd.read_csv(classification_file_path, sep=",", header=None)
             dtm = DocumentTranscriptionMetrics(
                 protocol, 
                 **{
@@ -1013,7 +985,7 @@ class FileProvider(Provider):
                 )
             except KeyError:
                 m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
-                    m_num_stats["GT_indx"], m_num_stats["P_indx_0.5"], gt.shape[0],
+                    m_num_stats["GT_indx"], m_num_stats["P_indx_0.3"], gt.shape[0],
                 )
             results["m_is_cdt_and_is_early"] = m_is_cdt_and_is_early
         else:
@@ -1030,16 +1002,13 @@ class FileProvider(Provider):
             activity="evaluation",
         )
 
-        eval_csv = BytesIO()
-        for key in results.keys():
-            if type(results[key]) is not list:
-                eval_csv.write(f"{key},{results[key]}\n".encode('utf-8'))
-            else:
-                eval_csv.write(f"{key},{','.join(str(x) for x in results[key])}\n".encode('utf-8'))
-
-        eval_csv.seek(0)
-
-        return eval_csv
+        # Metrics functions return ints as int64's which are 
+        # not compatible with json and must be converted
+        for k in results.keys():
+            for key in results[k].keys():
+                if type(results[k][key]) == np.int64:
+                    results[k][key] = int(results[k][key])
+        return results
 
     def complete_test(self, session_id: str, test_id: str) -> None:
         """Mark test as completed in session logs"""

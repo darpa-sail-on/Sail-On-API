@@ -342,7 +342,7 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
-    def test_get_feedback_acuracy(self):
+    def test_get_feedback_accuracy(self):
         """Test get_feedback with type score for cumulative accuracy."""
         response = get(
             "/session/feedback",
@@ -547,8 +547,8 @@ class TestApi(unittest.TestCase):
 
         _check_response(response)
 
-        actual = response.content.decode("utf-8")
-        self.assertTrue(len(actual) > 1)
+        actual = response.json()
+        self.assertEqual(8, len(actual))
 
     # Terminate Session Tests
     def test_terminate_session_success(self):

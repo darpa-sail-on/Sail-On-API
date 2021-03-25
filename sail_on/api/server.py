@@ -533,7 +533,7 @@ def evaluate() -> Response:
         session_id = data["session_id"]
         test_id = data["test_id"]
         logging.info(
-            f"Evaluate called with session_id: {session_id} test_id: {test_id}"  # noqa: E501
+            f"Evaluate called with session_id: {session_id} test_id: {test_id}"
         )
     except KeyError:
         raise ProtocolError(
@@ -544,12 +544,8 @@ def evaluate() -> Response:
 
     try:
         response = Binder.provider.evaluate(session_id, test_id)
-        logging.info(f"Returning eval file")
-        return send_file(
-            response,
-            attachment_filename=f"evaluation.{session_id}.{test_id}.csv",
-            mimetype="test/csv",
-        )
+        logging.info(f"Returning eval response as dictionary")
+        return response
     except ServerError as e:
         raise e
     except ProtocolError as e:

@@ -172,6 +172,6 @@ class ActivityRecognitionMetrics(ProgramMetrics):
         Returns
             Dictionary containing boolean showing if change was was detected and if it was detected early
         """
-        is_cdt = (ta2_idx >= gt_idx) & (ta2_idx < test_len)
-        is_early = ta2_idx < gt_idx
+        is_cdt = bool((ta2_idx >= gt_idx) & (ta2_idx < test_len))
+        is_early = bool(ta2_idx < gt_idx)
         return {"Is CDT": is_cdt, "Is Early": is_early}
