@@ -4,6 +4,11 @@ from .provider import Provider, FileResult
 from .errors import ServerError, ProtocolError, RoundError
 from .constants import ProtocolConstants
 
+from .evaluate.image_classification import ImageClassificationMetrics
+from .evaluate.activity_recognition import ActivityRecognitionMetrics
+from .evaluate.document_transcription import DocumentTranscriptionMetrics
+import pandas as pd
+
 import logging
 import os
 import glob
@@ -35,8 +40,10 @@ def read_meta_data(file_location):
     with open(file_location, "r") as md:
             return json.load(md)
 
-def get_session_info_path(path: str) -> Dict[str, Any]:
+# region Session log related functions
+def get_session_info(folder: str, session_id: str) -> Dict[str, Any]:
     """Retrieve session info."""
+    path = os.path.join(folder, f"{str(session_id)}.json")
     if os.path.exists(path):
         with open(path, "r") as session_file:
             info = json.load(session_file)
@@ -48,10 +55,6 @@ def get_session_info_path(path: str) -> Dict[str, Any]:
             else:
                 return info
     return {}
-
-def get_session_info(folder: str, session_id: str) -> Dict[str, Any]:
-    """Retrieve session info."""
-    return get_session_info_path(os.path.join(folder, f"{str(session_id)}.json"))
 
 def get_session_test_info(folder: str, session_id: str, test_id: str) -> Dict[str, Any]:
     path = os.path.join(folder, f"{str(session_id)}.{test_id}.json")
@@ -130,6 +133,8 @@ def log_session(
 
     if return_structure:
         return test_structure
+
+# endregion
 
 # region Feedback related functions
 def read_feedback_file(
@@ -273,7 +278,7 @@ def get_levenshtein_feedback(
         x: [
             nltk.edit_distance(
                 ensure_space(ground_truth[x][metadata["columns"][i]]), 
-                ensure_space(results[x][metadata["columns"][i]])
+                ensure_space(results[x][0])
             ) 
             for i,_ in enumerate(metadata["columns"])
         ]
@@ -820,18 +825,190 @@ class FileProvider(Provider):
         updated_test_structure["post_results"]["rounds"][str(round_id)]["types"] = new_types
         write_session_log_file(updated_test_structure, os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json"))
 
-    def evaluate(self, session_id: str, test_id: str, round_id: int) -> str:
-        """Perform evaluation."""
-        # TODO: Get rid of this, evaluate is in separate code base now
+    def evaluate(self, session_id: str, test_id: str) -> Dict:
+        """Perform Kitware developed evaluation code modifed to work in this API"""
+        
+        structure = get_session_info(self.results_folder, session_id)
+        protocol = structure["created"]["protocol"]
+        domain = structure["created"]["domain"]
+        ground_truth_file = os.path.join(self.folder, protocol, domain, f"{test_id}_single_df.csv")
+        gt = pd.read_csv(ground_truth_file, sep=",", header=None, skiprows=1,encoding='utf-8')
+        results = {}
+        metadata = self.get_test_metadata(session_id, test_id, False)
+
+        detection_file_path = os.path.join(
+            self.results_folder,
+            protocol,
+            domain,
+            f"{session_id}.{test_id}_detection.csv",
+        )
+        detections = pd.read_csv(detection_file_path, sep=",", header=None)
+        classification_file_path = os.path.join(
+            self.results_folder,
+            protocol,
+            domain,
+            f"{session_id}.{test_id}_classification.csv",
+        )
+        classifications = pd.read_csv(classification_file_path, sep=",", header=None)
+
+        # Image Classification Evaluation
+        if domain == "image_classification":
+            arm_im = ImageClassificationMetrics(
+                protocol, 
+                **{"image_id": 0, "detection": 1, "classification": 2}
+                )
+            m_num = arm_im.m_num(detections[1], gt[arm_im.detection_id])
+            results["m_num"] = m_num
+            m_num_stats = arm_im.m_num_stats(detections[1], gt[arm_im.detection_id])
+            results["m_num_stats"] = m_num_stats
+            m_ndp = arm_im.m_ndp(detections[1], gt[arm_im.detection_id])
+            results["m_ndp"] = m_ndp
+            m_ndp_pre = arm_im.m_ndp_pre(detections[1], gt[arm_im.detection_id])
+            results["m_ndp_pre"] = m_ndp_pre
+            m_ndp_post = arm_im.m_ndp_post(detections[1], gt[arm_im.detection_id])
+            results["m_ndp_post"] = m_ndp_post
+            m_acc = arm_im.m_acc(
+                gt[arm_im.detection_id],
+                classifications,
+                gt[arm_im.classification_id],
+                100,
+                5,
+            )
+            results["m_acc"] = m_acc
+            m_acc_failed = arm_im.m_ndp_failed_reaction(
+                detections[arm_im.detection_id],
+                gt[1],
+                classifications,
+                gt[arm_im.classification_id],
+            )
+            results["m_acc_failed"] = m_acc_failed
+            try:
+                m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
+                    m_num_stats["GT_indx"], m_num_stats[f"P_indx_{str(metadata['threshold'])}"], gt.shape[0],
+                )
+            except KeyError:
+                m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
+                    m_num_stats["GT_indx"], m_num_stats["P_indx_0.5"], gt.shape[0],
+                )
+            results["m_is_cdt_and_is_early"] = m_is_cdt_and_is_early
+
+        # Activity Recognition Evaluation
+        elif domain == "activity_recognition":
+            arm_ar = ActivityRecognitionMetrics(
+                protocol, 
+                **{
+                        "video_id": 0,
+                        "novel": 1,
+                        "detection": 2,
+                        "classification": 3,
+                        "spatial": 4,
+                        "temporal": 5
+                    }
+                )
+            m_num = arm_ar.m_num(detections[1], gt[arm_ar.novel_id])
+            results["m_num"] = m_num
+            m_num_stats = arm_ar.m_num_stats(detections[1], gt[arm_ar.novel_id])
+            results["m_num_stats"] = m_num_stats
+            m_ndp = arm_ar.m_ndp(detections[1], gt[arm_ar.novel_id])
+            results["m_ndp"] = m_ndp
+            m_ndp_pre = arm_ar.m_ndp_pre(detections[1], gt[arm_ar.novel_id])
+            results["m_ndp_pre"] = m_ndp_pre
+            m_ndp_post = arm_ar.m_ndp_post(detections[1], gt[arm_ar.novel_id])
+            results["m_ndp_post"] = m_ndp_post
+            m_acc = arm_ar.m_acc(
+                gt[arm_ar.novel_id],
+                classifications,
+                gt[arm_ar.classification_id],
+                100,
+                5,
+            )
+            results["m_acc"] = m_acc
+            m_acc_failed = arm_ar.m_ndp_failed_reaction(
+                detections[1],
+                gt[arm_ar.novel_id],
+                classifications,
+                gt[arm_ar.classification_id],
+            )
+            results["m_acc_failed"] = m_acc_failed
+            try:
+                m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
+                    m_num_stats["GT_indx"], m_num_stats[f"P_indx_{str(metadata['threshold'])}"], gt.shape[0],
+                )
+            except KeyError:
+                m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
+                    m_num_stats["GT_indx"], m_num_stats["P_indx_0.5"], gt.shape[0],
+                )
+            results["m_is_cdt_and_is_early"] = m_is_cdt_and_is_early
+
+        # Document Transcript Evaluation
+        elif domain == "transcripts":
+            dtm = DocumentTranscriptionMetrics(
+                protocol, 
+                **{
+                        "image_id": 0,
+                        "text": 1,
+                        "novel": 2,
+                        "representation": 3,
+                        "detection": 4,
+                        "classification": 5,
+                        "pen_pressure": 6,
+                        "letter_size": 7,
+                        "word_spacing": 8,
+                        "slant_angle": 9,
+                        "attribute": 10
+                    }
+                )
+            m_num = dtm.m_num(detections[1], gt[dtm.novel_id])
+            results["m_num"] = m_num
+            m_num_stats = dtm.m_num_stats(detections[1], gt[dtm.novel_id])
+            results["m_num_stats"] = m_num_stats
+            m_ndp = dtm.m_ndp(detections[1], gt[dtm.novel_id])
+            results["m_ndp"] = m_ndp
+            m_ndp_pre = dtm.m_ndp_pre(detections[1], gt[dtm.novel_id])
+            results["m_ndp_pre"] = m_ndp_pre
+            m_ndp_post = dtm.m_ndp_post(detections[1], gt[dtm.novel_id])
+            results["m_ndp_post"] = m_ndp_post
+            m_acc = dtm.m_acc(
+                gt[dtm.novel_id], classifications, gt[dtm.classification_id], 100, 5
+            )
+            results["m_acc"] = m_acc
+            m_acc_failed = dtm.m_ndp_failed_reaction(
+                detections[1],
+                gt[dtm.novel_id],
+                classifications,
+                gt[dtm.classification_id],
+            )
+            results["m_acc_failed"] = m_acc_failed
+            try:
+                m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
+                    m_num_stats["GT_indx"], m_num_stats[f"P_indx_{str(metadata['threshold'])}"], gt.shape[0],
+                )
+            except KeyError:
+                m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
+                    m_num_stats["GT_indx"], m_num_stats["P_indx_0.3"], gt.shape[0],
+                )
+            results["m_is_cdt_and_is_early"] = m_is_cdt_and_is_early
+        else:
+            raise ProtocolError(
+                "BadDomain",
+                f"Domain {domain} retrieved from session log for {session_id} does not match a proper domain type",
+                traceback.format_stack(),
+            )
+
         log_session(
             self.results_folder,
             session_id=session_id,
             test_id=test_id,
-            round_id=round_id,
             activity="evaluation",
         )
 
-        return os.path.join(self.folder, "evaluation.csv")
+        # Metrics functions return ints as int64's which are 
+        # not compatible with json and must be converted
+        for k in results.keys():
+            for key in results[k].keys():
+                if type(results[k][key]) == np.int64:
+                    results[k][key] = int(results[k][key])
+        return results
 
     def complete_test(self, session_id: str, test_id: str) -> None:
         """Mark test as completed in session logs"""

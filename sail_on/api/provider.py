@@ -84,8 +84,8 @@ class Provider(ABC):
         pass
 
     @abstractmethod
-    def evaluate(self, session_id: str, test_id: str, round_id: int) -> str:
-        """Perform evaluation."""
+    def evaluate(self, session_id: str, test_id: str) -> str:
+        """Perform Kitware developed evaluation code modifed to work in this API"""
         pass
 
     @abstractmethod

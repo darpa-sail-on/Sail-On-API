@@ -342,7 +342,7 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
-    def test_get_feedback_acuracy(self):
+    def test_get_feedback_accuracy(self):
         """Test get_feedback with type score for cumulative accuracy."""
         response = get(
             "/session/feedback",
@@ -538,21 +538,8 @@ class TestApi(unittest.TestCase):
 
 
     # Evaluation Tests
-    def test_evaluate_success_with_round_id(self):
+    def test_evaluate_success(self):
         """Test evaluate with rounds."""
-        response = get(
-            "/session/evaluations",
-            params={"session_id": "evaluation", "test_id": "OND.1.1.1234", "round_id": 0},
-        )
-
-        _check_response(response)
-
-        expected = "score, 0"
-        actual = response.content.decode("utf-8")
-        self.assertEqual(expected, actual)
-
-    def test_evaluate_success_without_round_id(self):
-        """Test evaluate without rounds."""
         response = get(
             "/session/evaluations",
             params={"session_id": "evaluation", "test_id": "OND.1.1.1234"},
@@ -560,9 +547,8 @@ class TestApi(unittest.TestCase):
 
         _check_response(response)
 
-        expected = "score, 0"
-        actual = response.content.decode("utf-8")
-        self.assertEqual(expected, actual)
+        actual = response.json()
+        self.assertEqual(8, len(actual))
 
     # Terminate Session Tests
     def test_terminate_session_success(self):
