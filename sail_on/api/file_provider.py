@@ -4,9 +4,6 @@ from .provider import Provider, FileResult
 from .errors import ServerError, ProtocolError, RoundError
 from .constants import ProtocolConstants
 
-from .evaluate.image_classification import ImageClassificationMetrics
-from .evaluate.activity_recognition import ActivityRecognitionMetrics
-from .evaluate.document_transcription import DocumentTranscriptionMetrics
 import pandas as pd
 
 import logging
@@ -827,6 +824,9 @@ class FileProvider(Provider):
 
     def evaluate(self, session_id: str, test_id: str) -> Dict:
         """Perform Kitware developed evaluation code modifed to work in this API"""
+        from .evaluate.image_classification import ImageClassificationMetrics
+        from .evaluate.activity_recognition import ActivityRecognitionMetrics
+        from .evaluate.document_transcription import DocumentTranscriptionMetrics
         
         structure = get_session_info(self.results_folder, session_id)
         protocol = structure["created"]["protocol"]

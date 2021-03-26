@@ -1,9 +1,6 @@
 """Activity Recognition Class for metrics for sail-on."""
 
 from .metrics import ProgramMetrics
-from evaluate.metrics import M_acc, M_num, M_ndp, M_num_stats
-from evaluate.metrics import M_ndp_failed_reaction
-from evaluate.metrics import M_accuracy_on_novel
 
 import numpy as np
 from pandas import DataFrame
@@ -64,6 +61,8 @@ class ActivityRecognitionMetrics(ProgramMetrics):
         Returns:
             Dictionary containing top1, top3 accuracy over the test, pre and post novelty.
         """
+        from evaluate.metrics import M_acc
+
         class_prob = p_class.iloc[:, range(1, p_class.shape[1])].to_numpy()
         gt_class_idx = gt_class.to_numpy()
         return M_acc(
@@ -79,6 +78,7 @@ class ActivityRecognitionMetrics(ProgramMetrics):
         Returns:
             Difference between the novelty introduction and predicting change in world.
         """
+        from evaluate.metrics import M_num
         return M_num(p_novel, gt_novel)
 
     def m_num_stats(self, p_novel: np.ndarray, gt_novel: np.ndarray) -> Dict:
@@ -90,6 +90,7 @@ class ActivityRecognitionMetrics(ProgramMetrics):
         Returns:
             Dictionary containing indices for novelty introduction and change in world prediction.
         """
+        from evaluate.metrics import M_num_stats
         return M_num_stats(p_novel, gt_novel)
 
     def m_ndp(self, p_novel: np.ndarray, gt_novel: np.ndarray) -> Dict:
@@ -101,6 +102,7 @@ class ActivityRecognitionMetrics(ProgramMetrics):
         Returns:
             Dictionary containing novelty detection performance over the test.
         """
+        from evaluate.metrics import M_ndp
         return M_ndp(p_novel, gt_novel, mode="full_test")
 
     def m_ndp_pre(self, p_novel: np.ndarray, gt_novel: np.ndarray) -> Dict:
@@ -112,6 +114,7 @@ class ActivityRecognitionMetrics(ProgramMetrics):
         Returns:
             Dictionary containing detection performance pre novelty.
         """
+        from evaluate.metrics import M_ndp
         return M_ndp(p_novel, gt_novel, mode="pre_novelty")
 
     def m_ndp_post(self, p_novel: np.ndarray, gt_novel: np.ndarray) -> Dict:
@@ -123,6 +126,7 @@ class ActivityRecognitionMetrics(ProgramMetrics):
         Returns:
             Dictionary containing detection performance post novelty.
         """
+        from evaluate.metrics import M_ndp
         return M_ndp(p_novel, gt_novel, mode="post_novelty")
 
     def m_ndp_failed_reaction(
@@ -142,6 +146,8 @@ class ActivityRecognitionMetrics(ProgramMetrics):
         Returns:
             Dictionary containing TP, FP, TN, FN, top1, top3 accuracy over the test.
         """
+        from evaluate.metrics import M_ndp_failed_reaction
+
         class_prob = p_class.iloc[:, range(1, p_class.shape[1])].to_numpy()
         gt_class_idx = gt_class.to_numpy()
         return M_ndp_failed_reaction(p_novel, gt_novel, class_prob, gt_class_idx)
@@ -158,6 +164,8 @@ class ActivityRecognitionMetrics(ProgramMetrics):
         Returns:
             Accuracy on novely samples
         """
+        from evaluate.metrics import M_accuracy_on_novel
+
         class_prob = p_class.iloc[:, range(1, p_class.shape[1])].to_numpy()
         gt_class_idx = gt_class.to_numpy()
         return M_accuracy_on_novel(class_prob, gt_class_idx, gt_novel)
