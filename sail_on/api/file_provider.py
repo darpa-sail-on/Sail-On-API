@@ -931,11 +931,11 @@ class FileProvider(Provider):
             )
             results["m_acc_failed"] = m_acc_failed
             try:
-                m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
+                m_is_cdt_and_is_early = arm_ar.m_is_cdt_and_is_early(
                     m_num_stats["GT_indx"], m_num_stats[f"P_indx_{str(metadata['threshold'])}"], gt.shape[0],
                 )
             except KeyError:
-                m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
+                m_is_cdt_and_is_early = arm_ar.m_is_cdt_and_is_early(
                     m_num_stats["GT_indx"], m_num_stats["P_indx_0.5"], gt.shape[0],
                 )
             results["m_is_cdt_and_is_early"] = m_is_cdt_and_is_early
@@ -980,11 +980,11 @@ class FileProvider(Provider):
             )
             results["m_acc_failed"] = m_acc_failed
             try:
-                m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
+                m_is_cdt_and_is_early = dtm.m_is_cdt_and_is_early(
                     m_num_stats["GT_indx"], m_num_stats[f"P_indx_{str(metadata['threshold'])}"], gt.shape[0],
                 )
             except KeyError:
-                m_is_cdt_and_is_early = arm_im.m_is_cdt_and_is_early(
+                m_is_cdt_and_is_early = dtm.m_is_cdt_and_is_early(
                     m_num_stats["GT_indx"], m_num_stats["P_indx_0.3"], gt.shape[0],
                 )
             results["m_is_cdt_and_is_early"] = m_is_cdt_and_is_early
