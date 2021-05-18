@@ -29,7 +29,7 @@ from cachetools import LRUCache, cached
 @cached(cache=LRUCache(maxsize=32))
 def read_gt_csv_file(file_location):
     with open(file_location, "r") as f:
-        csv_reader = csv.reader(f, delimiter=",")
+        csv_reader = csv.reader(f, delimiter=",", quotechar='|')
         return [x for x in csv_reader][1:]
 
 @cached(cache=LRUCache(maxsize=128))
@@ -257,7 +257,7 @@ def get_characterization_feedback(
     }
 
 def ensure_space(input_str): 
-    return ' '.join([x.strip() for x in re.split(r'(\W+)',input_str.replace(';','').replace('|','').replace('  ',' '))])
+    return ' '.join([x.strip() for x in re.split(r'(\W+)',input_str.replace(';','').replace('"','').replace('|','').replace('  ',' '))])
 
 def get_levenshtein_feedback(
         gt_file: str,
