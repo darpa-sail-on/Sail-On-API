@@ -743,7 +743,7 @@ class FileProvider(Provider):
 
         # if budgeted, decrement use and check if too many has been requested
         if feedback_definition['budgeted_feedback']:
-            left_over_ids = int(metadata.get("feedback_max_ids", 0) - feedback_count)
+            left_over_ids = int(metadata.get("feedback_max_ids", 0)) - feedback_count
             number_of_ids_to_return = min(number_of_ids_to_return, left_over_ids)
         feedback_count+=number_of_ids_to_return
 
