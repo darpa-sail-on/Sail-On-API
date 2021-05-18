@@ -29,7 +29,7 @@ from cachetools import LRUCache, cached
 @cached(cache=LRUCache(maxsize=32))
 def read_gt_csv_file(file_location):
     with open(file_location, "r") as f:
-        csv_reader = csv.reader(f, delimiter=",")
+        csv_reader = csv.reader(f, delimiter=",", quotechar='|')
         return [x for x in csv_reader][1:]
 
 @cached(cache=LRUCache(maxsize=128))
@@ -192,7 +192,7 @@ def get_classification_feedback(
             result_reader = csv.reader(rf, delimiter=",")
             results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
             feedback_max_ids = min(metadata.get('feedback_max_ids',len(results)),len(results))
-            feedback_ids = list(results.keys())[:feedback_max_ids]
+            feedback_ids = list(results.keys())[:int(feedback_max_ids)]
 
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
@@ -257,7 +257,7 @@ def get_characterization_feedback(
     }
 
 def ensure_space(input_str): 
-    return ' '.join([x.strip() for x in re.split(r'(\W+)',input_str.replace(';','').replace('|','').replace('  ',' '))])
+    return ' '.join([x.strip() for x in re.split(r'(\W+)',input_str.replace(';','').replace('"','').replace('|','').replace('  ',' '))])
 
 def get_levenshtein_feedback(
         gt_file: str,
@@ -743,7 +743,7 @@ class FileProvider(Provider):
 
         # if budgeted, decrement use and check if too many has been requested
         if feedback_definition['budgeted_feedback']:
-            left_over_ids = metadata.get("feedback_max_ids", 0) - feedback_count
+            left_over_ids = int(metadata.get("feedback_max_ids", 0)) - feedback_count
             number_of_ids_to_return = min(number_of_ids_to_return, left_over_ids)
         feedback_count+=number_of_ids_to_return
 
