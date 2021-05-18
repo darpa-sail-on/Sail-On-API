@@ -192,7 +192,7 @@ def get_classification_feedback(
             result_reader = csv.reader(rf, delimiter=",")
             results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
             feedback_max_ids = min(metadata.get('feedback_max_ids',len(results)),len(results))
-            feedback_ids = list(results.keys())[:feedback_max_ids]
+            feedback_ids = list(results.keys())[:int(feedback_max_ids)]
 
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
@@ -743,7 +743,7 @@ class FileProvider(Provider):
 
         # if budgeted, decrement use and check if too many has been requested
         if feedback_definition['budgeted_feedback']:
-            left_over_ids = metadata.get("feedback_max_ids", 0) - feedback_count
+            left_over_ids = int(metadata.get("feedback_max_ids", 0) - feedback_count)
             number_of_ids_to_return = min(number_of_ids_to_return, left_over_ids)
         feedback_count+=number_of_ids_to_return
 
