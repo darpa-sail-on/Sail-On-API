@@ -29,7 +29,7 @@ from cachetools import LRUCache, cached
 @cached(cache=LRUCache(maxsize=32))
 def read_gt_csv_file(file_location):
     with open(file_location, "r") as f:
-        csv_reader = csv.reader(f, delimiter=",", quotechar='|')
+        csv_reader = csv.reader(f, delimiter=",")
         return [x for x in csv_reader][1:]
 
 @cached(cache=LRUCache(maxsize=128))
@@ -196,7 +196,6 @@ def get_classification_feedback(
 
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
-
     return {
         x: min(int(ground_truth[x][metadata["columns"][0]]), metadata["known_classes"]) 
         for x in ground_truth.keys()
