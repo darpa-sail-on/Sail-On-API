@@ -1001,12 +1001,6 @@ class FileProvider(Provider):
                 traceback.format_stack(),
             )
 
-        log_session(
-            self.results_folder,
-            session_id=session_id,
-            test_id=test_id,
-            activity="evaluation",
-        )
 
         # Metrics functions return ints as int64's which are 
         # not compatible with json and must be converted
