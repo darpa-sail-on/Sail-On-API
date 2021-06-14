@@ -35,7 +35,7 @@ def read_gt_csv_file(file_location):
 @cached(cache=LRUCache(maxsize=128))
 def read_meta_data(file_location):
     with open(file_location, "r") as md:
-            return json.load(md)
+        return json.load(md)
 
 # region Session log related functions
 def get_session_info(folder: str, session_id: str, in_process_only = True) -> Dict[str, Any]:
