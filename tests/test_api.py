@@ -542,13 +542,26 @@ class TestApi(unittest.TestCase):
         """Test evaluate with rounds."""
         response = get(
             "/session/evaluations",
-            params={"session_id": "evaluation", "test_id": "OND.1.1.1234"},
+            params={"session_id": "evaluation_success", "test_id": "OND.1.1.1234"},
         )
 
         _check_response(response)
 
         actual = response.json()
         self.assertEqual(8, len(actual))
+
+    def test_evaluate_failure(self):
+        """Test evaluate with rounds."""
+        response = get(
+            "/session/evaluations",
+            params={"session_id": "evaluation_failure", "test_id": "OND.1.1.1234"},
+        )
+
+        try:
+            _check_response(response)
+            self.assertTrue(False, "Failed")
+        except errors.ApiError as e:
+            self.assertEqual("SessionInProcess", e.reason)
 
     # Terminate Session Tests
     def test_terminate_session_success(self):
