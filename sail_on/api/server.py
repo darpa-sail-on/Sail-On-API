@@ -532,6 +532,7 @@ def evaluate() -> Response:
     try:
         session_id = data["session_id"]
         test_id = data["test_id"]
+        devmode = data.get("devmode", False)
         logging.info(
             f"Evaluate called with session_id: {session_id} test_id: {test_id}"
         )
@@ -543,7 +544,7 @@ def evaluate() -> Response:
         )
 
     try:
-        response = Binder.provider.evaluate(session_id, test_id)
+        response = Binder.provider.evaluate(session_id, test_id, devmode)
         logging.info(f"Returning eval response as dictionary")
         return response
     except ServerError as e:
