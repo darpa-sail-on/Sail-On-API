@@ -6,6 +6,11 @@
     "detector": "0.1.1",
     "detection_threshold": 0.1
   },
+  "tests": {
+    "completed_tests": [
+			"OND.1.1.1234"
+		]
+	},
   "termination": {
     "time": "2020-04-06 12:03:00.144872"
   }

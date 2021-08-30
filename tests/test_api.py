@@ -286,7 +286,7 @@ class TestApi(unittest.TestCase):
 
         try:
             _check_response(response)
-        except errors.ApiError as e:
+        except errors.ApiError:
             self.assertFalse(True, 'failed')
 
     def test_get_feedback_success_cluster(self):
@@ -550,6 +550,18 @@ class TestApi(unittest.TestCase):
         actual = response.json()
         self.assertEqual(8, len(actual))
 
+    def test_evaluate_success_devmode(self):
+        """Test evaluate with rounds."""
+        response = get(
+            "/session/evaluations",
+            params={"session_id": "evaluation_failure", "test_id": "OND.1.1.1234", "devmode": True},
+        )
+
+        _check_response(response)
+
+        actual = response.json()
+        self.assertEqual(8, len(actual))
+
     def test_evaluate_failure(self):
         """Test evaluate with rounds."""
         response = get(
@@ -561,7 +573,7 @@ class TestApi(unittest.TestCase):
             _check_response(response)
             self.assertTrue(False, "Failed")
         except errors.ApiError as e:
-            self.assertEqual("SessionInProcess", e.reason)
+            self.assertEqual("TestInProcess", e.reason)
 
     # Terminate Session Tests
     def test_terminate_session_success(self):
