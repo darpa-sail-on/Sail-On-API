@@ -38,13 +38,20 @@ def read_meta_data(file_location):
         return json.load(md)
 
 # region Session log related functions
-def get_session_info(folder: str, session_id: str) -> Dict[str, Any]:
+def get_session_info(folder: str, session_id: str, in_process_only: bool = True) -> Dict[str, Any]:
     """Retrieve session info."""
     path = os.path.join(folder, f"{str(session_id)}.json")
     if os.path.exists(path):
         with open(path, "r") as session_file:
             info = json.load(session_file)
-            return info
+            terminated =  "termination" in info
+            if terminated and in_process_only:
+                raise ProtocolError(
+                    "SessionEnded", 
+                    "The session being requested has already been terminated. Please either create a new session or request a different ID",
+                )
+            else:
+                return info
     return {}
 
 def get_session_test_info(folder: str, session_id: str, test_id: str) -> Dict[str, Any]:
@@ -357,10 +364,10 @@ class FileProvider(Provider):
         self.results_folder = results_folder
         os.makedirs(results_folder, exist_ok=True)
 
-    def get_test_metadata(self, session_id: str, test_id: str, api_call: bool = True) -> Dict[str, Any]:
+    def get_test_metadata(self, session_id: str, test_id: str, api_call: bool = True, in_process_only:bool = True) -> Dict[str, Any]:
         """Get test metadata"""
         try:
-            structure = get_session_info(self.results_folder, session_id)
+            structure = get_session_info(self.results_folder, session_id, in_process_only=in_process_only)
             info = structure['created']
             metadata_location = os.path.join(self.folder, info["protocol"], info["domain"], f"{test_id}_metadata.json")
         except KeyError:
@@ -815,7 +822,7 @@ class FileProvider(Provider):
         from .evaluate.activity_recognition import ActivityRecognitionMetrics
         from .evaluate.document_transcription import DocumentTranscriptionMetrics
         
-        structure = get_session_info(self.results_folder, session_id)
+        structure = get_session_info(self.results_folder, session_id, in_process_only=False)
 
         if not devmode:
             if test_id not in structure.get("tests", {}).get("completed_tests", {}):
@@ -832,7 +839,7 @@ class FileProvider(Provider):
         ground_truth_file = os.path.join(self.folder, protocol, domain, f"{test_id}_single_df.csv")
         gt = pd.read_csv(ground_truth_file, sep=",", header=None, skiprows=1,encoding='utf-8')
         results = {}
-        metadata = self.get_test_metadata(session_id, test_id, False)
+        metadata = self.get_test_metadata(session_id, test_id, False, in_process_only=False)
 
         detection_file_path = os.path.join(
             self.results_folder,
