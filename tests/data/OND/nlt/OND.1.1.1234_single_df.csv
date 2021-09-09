@@ -1,0 +1,5 @@
+instanceid, text, reported_writer_id, real_writer_id, sentiment, product, novelty_indicator, novel_instance, text_id
+0,|this is great|,1,1,5,2,0,4,abcde-12345
+1,|this is bad|,0,0,1,4,0,4,abcde-12345
+2,|this is alright|,0,1,3,1,0,4,abcde-12345
+3,|this is meh|,1,0,2,6,0,4,abcde-12345

@@ -386,10 +386,10 @@ def nlt_score_feedback(
     # calculate score for current round
     score = score_sect["score"]
     for id in results.keys():
-        if results[id][0] == 0:
+        if results[id][0] == '0':
             if ground_truth[id][metadata["columns"][0]] != ground_truth[id][metadata["columns"][1]]:
                 score += 1
-        elif results[id][0] == 1:
+        elif results[id][0] == '1':
             if ground_truth[id][metadata["columns"][0]] == ground_truth[id][metadata["columns"][1]]:
                 score += 1
         else:
@@ -423,7 +423,11 @@ def nlt_labels_feedback(
 
     # Subtract 1 from the current score in the session test log
     test_structure = get_session_test_info(metadata["folder"], metadata["session_id"], metadata["test_id"])
-    test_structure["current_score"]["score"] -= 1
+    if "current_score" in test_structure:
+        test_structure["current_score"]["score"] -= len(feedback_ids)
+    else:
+        test_structure["current_score"] = {"score": (-1 * len(feedback_ids))}
+    
     write_session_log_file(test_structure, os.path.join(
         metadata["folder"], 
         f"{str(metadata['session_id'])}.{str(metadata['test_id'])}.json")
@@ -579,8 +583,8 @@ class FileProvider(Provider):
             temp_file_path = BytesIO()
             lines = read_gt_csv_file(file_location)
             # Get a variety of data for NLT domain, or just id for all other domains
-            if info["domain"] == "NLT":
-                lines = [[x[0], x[2], x[1].strip("\n\t\r"), x[4], x[5]] for x in lines if x[0].strip("\n\t\"',.") != ""]
+            if info["domain"] == "nlt":
+                lines = [f"{x[0]},{x[2]},|||,{x[4]},{x[5]}".replace("|||", x[1].strip('\n\t\r')) for x in lines if x[0].strip("\n\t\"',.") != ""]
             else:
                 lines = [x[0] for x in lines if x[0].strip("\n\t\"',.") != ""]
             try:
@@ -688,7 +692,7 @@ class FileProvider(Provider):
                 "include_test_info": True
             },
             ProtocolConstants.LABELS: {
-                "functon": nlt_labels_feedback,
+                "function": nlt_labels_feedback,
                 "files": [],
                 "columns": [2],
                 "detection_req": ProtocolConstants.IGNORE,
