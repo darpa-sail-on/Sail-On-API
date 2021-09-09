@@ -172,7 +172,7 @@ def test_ids_request() -> Response:
                 response["test_ids"],
                 attachment_filename=f'{protocol}_{domain}_{response["generator_seed"]}.csv',
                 as_attachment=True,
-                mimetype="test/csv",
+                mimetype="text/csv",
             )
         except Exception as e:
             raise ServerError(str(type(e)), str(e), traceback.format_exc())
@@ -257,8 +257,8 @@ def dataset_request() -> Response:
         -test_id
         -round_id
     Returns:
-        -dataset_uris
-        -num_samples
+        -data ids
+        -review text (NLT domain only)
     """
 
     # Attempts to retrieve the proper variables from the API call body,
@@ -293,7 +293,7 @@ def dataset_request() -> Response:
     # returns the file
     try:
         logging.info(f"Returning dataset_uris at file path: {file_name}")
-        return send_file(file_name, attachment_filename=f'{session_id}.{test_id}.{round_id}.csv', mimetype="test/csv")
+        return send_file(file_name, attachment_filename=f'{session_id}.{test_id}.{round_id}.csv', mimetype="Content-Type: text/csv; charset=utf-16")
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
@@ -363,7 +363,7 @@ def get_feedback() -> Response:
             
             return Response(m.to_string(), content_type=m.content_type, status=200)
         else:
-            return send_file(responses[feedback_types[0]], attachment_filename=f'{session_id}.{test_id}.{round_id}_{feedback_types[0]}.csv', mimetype="test/csv")
+            return send_file(responses[feedback_types[0]], attachment_filename=f'{session_id}.{test_id}.{round_id}_{feedback_types[0]}.csv', mimetype="text/csv")
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
@@ -510,7 +510,7 @@ def post_results_get_feedback() -> Response:
             
             return Response(m.to_string(), content_type=m.content_type, status=200)
         else:
-            return send_file(responses[feedback_types[0]], attachment_filename=f'{session_id}.{test_id}.{round_id}_{feedback_types[0]}.csv', mimetype="test/csv")
+            return send_file(responses[feedback_types[0]], attachment_filename=f'{session_id}.{test_id}.{round_id}_{feedback_types[0]}.csv', mimetype="text/csv")
     except Exception as e:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 

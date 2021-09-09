@@ -37,6 +37,17 @@ def read_meta_data(file_location):
     with open(file_location, "r") as md:
         return json.load(md)
 
+# Returns the encoding for the specified domain
+def get_encoding(domain: str):
+    if domain == "nlt":
+        return ProtocolConstants.NLT_ENCODING
+    elif domain == "activity_recognition":
+        return ProtocolConstants.VAR_ENCODING
+    elif domain == "transcripts":
+        return ProtocolConstants.WTR_ENCODING
+    else:
+        return "utf-8"
+
 # region Session log related functions
 def get_session_info(folder: str, session_id: str, in_process_only: bool = True) -> Dict[str, Any]:
     """Retrieve session info."""
@@ -352,6 +363,74 @@ def psuedo_label_feedback(
 
     return return_dict
 
+def nlt_score_feedback(
+    gt_file: str,
+    result_files: List[str],
+    feedback_ids: List[str],
+    metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Calculates and returns the score feedback for tests in the nlt domain"""
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata)
+    with open(result_files[0], "r") as rf:
+        result_reader = csv.reader(rf, delimiter=",")
+        results = read_feedback_file(result_reader, None, metadata)
+    
+    test_structure = get_session_test_info(metadata["folder"], metadata["session_id"], metadata["test_id"])
+
+    # Pull the current score from the session log or initialize it
+    if "current_score" in test_structure:
+        score_sect = test_structure["current_score"]
+    else:
+        score_sect = {"score": 0}
+
+    # calculate score for current round
+    score = score_sect["score"]
+    for id in results.keys():
+        if results[id][0] == 0:
+            if ground_truth[id][metadata["columns"][0]] != ground_truth[id][metadata["columns"][1]]:
+                score += 1
+        elif results[id][0] == 1:
+            if ground_truth[id][metadata["columns"][0]] == ground_truth[id][metadata["columns"][1]]:
+                score += 1
+        else:
+            raise ProtocolError("InvalidTuple", f"First var of tuple for {id} is not valid")
+        
+        if results[id][1] == ground_truth[id][metadata["columns"][1]]:
+            score += 1
+
+    # Iterate the round and save the 
+    score_sect["score"] = score
+    test_structure["current_score"] = score_sect
+    write_session_log_file(test_structure, os.path.join(
+        metadata["folder"], 
+        f"{str(metadata['session_id'])}.{str(metadata['test_id'])}.json")
+    )
+
+    return {"current_score": score}
+
+def nlt_labels_feedback(
+    gt_file: str,
+    result_files: List[str],
+    feedback_ids: List[str],
+    metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    "Returns the real writer id labels for specified instance ids in the nlt domain"
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata)
+    
+    return_dict = {
+        x: ground_truth[x][metadata["columns"][0]] for x in ground_truth.keys()
+    }
+
+    # Subtract 1 from the current score in the session test log
+    test_structure = get_session_test_info(metadata["folder"], metadata["session_id"], metadata["test_id"])
+    test_structure["current_score"]["score"] -= 1
+    write_session_log_file(test_structure, os.path.join(
+        metadata["folder"], 
+        f"{str(metadata['session_id'])}.{str(metadata['test_id'])}.json")
+    )
+
+    return return_dict
+
 # endregion
 
 
@@ -499,7 +578,11 @@ class FileProvider(Provider):
 
             temp_file_path = BytesIO()
             lines = read_gt_csv_file(file_location)
-            lines = [x[0] for x in lines if x[0].strip("\n\t\"',.") != ""]
+            # Get a variety of data for NLT domain, or just id for all other domains
+            if info["domain"] == "NLT":
+                lines = [[x[0], x[2], x[1].strip("\n\t\r"), x[4], x[5]] for x in lines if x[0].strip("\n\t\"',.") != ""]
+            else:
+                lines = [x[0] for x in lines if x[0].strip("\n\t\"',.") != ""]
             try:
                     round_pos = int(round_id) * int(metadata["round_size"])
             except KeyError:
@@ -511,7 +594,9 @@ class FileProvider(Provider):
             if round_pos >= len(lines):
                 return None
 
-            text = ('\n'.join(lines[round_pos:round_pos + int(metadata["round_size"])]) + "\n").encode('utf-8')
+            text = ('\n'.join(lines[round_pos:round_pos + int(metadata["round_size"])]) + "\n").encode(
+                get_encoding(info["domain"]))
+
             temp_file_path.write(text)
             temp_file_path.seek(0)
         else:
@@ -591,6 +676,24 @@ class FileProvider(Provider):
                 "columns": [2],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": False
+            }
+        },
+        "nlt": {
+            ProtocolConstants.SCORE: {
+                "function": nlt_score_feedback,
+                "files": [ProtocolConstants.LABELS],
+                "columns": [1, 2],
+                "detection_req": ProtocolConstants.IGNORE,
+                "budgeted_feedback": True,
+                "include_test_info": True
+            },
+            ProtocolConstants.LABELS: {
+                "functon": nlt_labels_feedback,
+                "files": [],
+                "columns": [2],
+                "detection_req": ProtocolConstants.IGNORE,
+                "budgeted_feedback": False,
+                "include_test_info": True
             }
         }
     }
@@ -708,6 +811,11 @@ class FileProvider(Provider):
         # Add columns to metadata for use in feedback
         metadata["columns"] = feedback_definition.get("columns", [])
 
+        if feedback_definition.get("include_test_info", False):
+            metadata["folder"] = self.results_folder
+            metadata["session_id"] = session_id
+            metadata["test_id"] = test_id
+
         # Get feedback from specified test
         try:
             if "psuedo" in feedback_type:
@@ -754,9 +862,9 @@ class FileProvider(Provider):
         feedback_csv = BytesIO()
         for key in feedback.keys():
             if type(feedback[key]) is not list:
-                feedback_csv.write(f"{key},{feedback[key]}\n".encode('utf-8'))
+                feedback_csv.write(f"{key},{feedback[key]}\n".encode(get_encoding(domain)))
             else:
-                feedback_csv.write(f"{key},{','.join(str(x) for x in feedback[key])}\n".encode('utf-8'))
+                feedback_csv.write(f"{key},{','.join(str(x) for x in feedback[key])}\n".encode(get_encoding(domain)))
             number_of_ids_to_return-=1
             # once maximium requested number is hit, quit
             if number_of_ids_to_return == 0:
@@ -837,7 +945,7 @@ class FileProvider(Provider):
         protocol = structure["created"]["protocol"]
         domain = structure["created"]["domain"]
         ground_truth_file = os.path.join(self.folder, protocol, domain, f"{test_id}_single_df.csv")
-        gt = pd.read_csv(ground_truth_file, sep=",", header=None, skiprows=1,encoding='utf-8')
+        gt = pd.read_csv(ground_truth_file, sep=",", header=None, skiprows=1,encoding=get_encoding(domain))
         results = {}
         metadata = self.get_test_metadata(session_id, test_id, False, in_process_only=False)
 
