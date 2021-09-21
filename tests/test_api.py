@@ -375,7 +375,7 @@ class TestApi(unittest.TestCase):
 
         _check_response(response)
 
-        expected = "abcde.mp4,1,2,3,4,5,0,0,0,0,0,0,0,0\nfghij.mp4,6,7,8,9,10,1,1,1,1,1,1,1,1\n"
+        expected = "abcde.mp4,1,2,3,4,5\nfghij.mp4,6,7,8,9,10\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 

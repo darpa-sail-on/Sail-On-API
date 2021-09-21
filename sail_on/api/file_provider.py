@@ -205,7 +205,7 @@ def get_classification_var_feedback(
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     return {
-        x: ground_truth[x][metadata["columns"][0]:]
+        x: ground_truth[x][metadata["columns"][0]:metadata["columns"][1]]
         for x in ground_truth.keys()
     }
 
@@ -593,7 +593,7 @@ class FileProvider(Provider):
             ProtocolConstants.CLASSIFICATION:  {
                 "function": get_classification_var_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
-                "columns": [5],
+                "columns": [5, 10],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True
             },
