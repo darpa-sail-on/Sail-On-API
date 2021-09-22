@@ -33,8 +33,8 @@ def read_gt_csv_file(file_location):
         return [x for x in csv_reader][1:]
 
 @cached(cache=LRUCache(maxsize=128))
-def read_meta_data(file_location):
-    with open(file_location, "r") as md:
+def read_meta_data(file_location, domain):
+    with open(file_location, "r", encoding=get_encoding(domain)) as md:
         return json.load(md)
 
 # Returns the encoding for the specified domain
@@ -479,7 +479,7 @@ class FileProvider(Provider):
 
         approved_metadata.extend([data for data in ["red_light"] if data in hints])
 
-        md = read_meta_data(metadata_location)
+        md = read_meta_data(metadata_location, info["domain"])
         if api_call:
                 return {
                     k: v for k, v in md.items() if k in approved_metadata
