@@ -27,8 +27,8 @@ from io import BytesIO
 from cachetools import LRUCache, cached
 
 @cached(cache=LRUCache(maxsize=32))
-def read_gt_csv_file(file_location):
-    with open(file_location, "r") as f:
+def read_gt_csv_file(file_location, domain):
+    with open(file_location, "r", encoding=get_encoding(domain)) as f:
         csv_reader = csv.reader(f, delimiter=",", quotechar='|')
         return [x for x in csv_reader][1:]
 
@@ -199,7 +199,7 @@ def get_classification_feedback(
             feedback_max_ids = min(metadata.get('feedback_max_ids',len(results)),len(results))
             feedback_ids = list(results.keys())[:int(feedback_max_ids)]
 
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     return {
@@ -216,7 +216,7 @@ def get_classificaton_score_feedback(
 ) -> Dict[str, Any]:
     """Calculates and returns feedback on the accuracy of classification"""
 
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), None, metadata, check_constrained=False)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), None, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, None, metadata, check_constrained=False)
@@ -246,7 +246,7 @@ def get_characterization_feedback(
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata)
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata, check_constrained=False)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata, check_constrained=False)
 
 
     # If ground truth is not novel, returns 1 is prediction is correct, 
@@ -271,7 +271,7 @@ def get_levenshtein_feedback(
         metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for levenshtein type feedback"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata, check_constrained=False)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata)
@@ -294,7 +294,7 @@ def get_cluster_feedback(
         metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for cluster type feedback"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata, check_constrained=False)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata)
@@ -337,7 +337,7 @@ def psuedo_label_feedback(
         session_id: str
 ) -> Dict[str, Any]:
     "Grabs psuedo label feedback for requested ids"
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata)
 
     structure = get_session_info(folder, session_id)
 
@@ -370,7 +370,7 @@ def nlt_score_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns the score feedback for tests in the nlt domain"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, None, metadata)
@@ -415,7 +415,7 @@ def nlt_labels_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     "Returns the real writer id labels for specified instance ids in the nlt domain"
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata)
     
     return_dict = {
         x: ground_truth[x][metadata["columns"][0]] for x in ground_truth.keys()
@@ -581,7 +581,7 @@ class FileProvider(Provider):
 
 
             temp_file_path = BytesIO()
-            lines = read_gt_csv_file(file_location)
+            lines = read_gt_csv_file(file_location, info["domain"])
             # Get a variety of data for NLT domain, or just id for all other domains
             if info["domain"] == "nlt":
                 lines = [f"{x[0]},{x[2]},|||,{x[4]},{x[5]}".replace("|||", x[1].strip('\n\t\r')) for x in lines if x[0].strip("\n\t\"',.") != ""]
@@ -814,6 +814,7 @@ class FileProvider(Provider):
 
         # Add columns to metadata for use in feedback
         metadata["columns"] = feedback_definition.get("columns", [])
+        metadata["domain"] = domain
 
         if feedback_definition.get("include_test_info", False):
             metadata["folder"] = self.results_folder
