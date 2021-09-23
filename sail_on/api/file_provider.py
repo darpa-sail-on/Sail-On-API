@@ -178,8 +178,6 @@ def get_classification_feedback(
         metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for classification type feedback"""
-
-
     if (feedback_ids is None or len(feedback_ids) == 0):
         # if feedback ids not provided, limit to those in the last round
         with open(result_files[0], "r") as rf:
@@ -196,6 +194,20 @@ def get_classification_feedback(
         for x in ground_truth.keys()
     }
 
+def get_classification_var_feedback(
+    gt_file: str,
+    result_files: List[str],
+    feedback_ids: List[str],
+    metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Grabs and returns"""
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)
+
+    return {
+        x: ground_truth[x][metadata["columns"][0]:metadata["columns"][1]]
+        for x in ground_truth.keys()
+    }
 
 def get_classificaton_score_feedback(
         gt_file: str,
@@ -579,9 +591,9 @@ class FileProvider(Provider):
         },
         "activity_recognition" : {
             ProtocolConstants.CLASSIFICATION:  {
-                "function": get_classification_feedback,
+                "function": get_classification_var_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
-                "columns": [2],
+                "columns": [5, 10],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True
             },

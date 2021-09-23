@@ -774,7 +774,7 @@ def command_line() -> None:
         "--url",
         help="(hostname:port) of the server",
         required=False,
-        default="localhost:3306",
+        default="localhost:12345",
     )
     parser.add_argument("--log-file", help="File to save log", default="server.log")
     parser.add_argument("--log-level", default=logging.INFO, help="Logging levels")
