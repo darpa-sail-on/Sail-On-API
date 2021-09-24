@@ -371,7 +371,7 @@ def nlt_score_feedback(
 ) -> Dict[str, Any]:
     """Calculates and returns the score feedback for tests in the nlt domain"""
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata)
-    with open(result_files[0], "r") as rf:
+    with open(result_files[0], "r", encoding=get_encoding(metadata["domain"])) as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, None, metadata)
     
@@ -398,7 +398,7 @@ def nlt_score_feedback(
         if results[id][1] == ground_truth[id][metadata["columns"][1]]:
             score += 1
 
-    # Iterate the round and save the 
+    # Save the score
     score_sect["score"] = score
     test_structure["current_score"] = score_sect
     write_session_log_file(test_structure, os.path.join(
