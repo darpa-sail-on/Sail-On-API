@@ -279,7 +279,7 @@ def dataset_request() -> Response:
         )
 
     try:
-        file_name = Binder.provider.dataset_request2(session_id, test_id, round_id)
+        file_name = Binder.provider.dataset_request(session_id, test_id, round_id)
         print(file_name)
     except ServerError as e:
         raise e

@@ -1133,7 +1133,7 @@ class FileProviderSVO(FileProvider):
     def __init__(self, folder: str, results_folder: str):
         super().__init__(folder, results_folder)
     
-    def dataset_request2(self, session_id: str, test_id: str, round_id: int) -> FileResult:
+    def dataset_request(self, session_id: str, test_id: str, round_id: int) -> FileResult:
         """Request a dataset."""
         try:
             info = get_session_info(self.results_folder, session_id)['created']
