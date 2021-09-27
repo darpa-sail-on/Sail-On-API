@@ -1128,3 +1128,72 @@ class FileProvider(Provider):
         latest = {}
         latest["finished_tests"] = structure["tests"]["completed_tests"]
         return latest
+
+class FileProviderSVO(FileProvider):
+    def __init__(self, folder: str, results_folder: str):
+        super().__init__(folder, results_folder)
+    
+    def dataset_request2(self, session_id: str, test_id: str, round_id: int) -> FileResult:
+        """Request a dataset."""
+        try:
+            info = get_session_info(self.results_folder, session_id)['created']
+            test_info = get_session_test_info(self.results_folder, session_id, test_id)
+            file_location = os.path.join(self.folder, info["protocol"], info["domain"], f"{test_id}_single_df.csv")
+        except KeyError:
+            raise ProtocolError("session_id_invalid", f"Provided session id {session_id} could not be found or was improperly set up")
+        
+        if not os.path.exists(file_location):
+            raise ServerError(
+                "test_id_invalid",
+                f"Test Id {test_id} could not be matched to a specific file",
+                traceback.format_stack(),
+            )
+
+        metadata = self.get_test_metadata(session_id, test_id, False)
+
+        if round_id is not None:
+            # Check for removing leftover files from restarting tests within a session
+            if int(round_id) == 0 and test_info:
+                test_session_path = os.path.join(self.results_folder, f"{str(session_id)}.{str(test_id)}.json")
+                if os.path.exists(test_session_path):
+                    os.remove(test_session_path)
+                test_result_paths = glob.glob(os.path.join(
+                    self.results_folder, 
+                    info["protocol"], 
+                    info["domain"], 
+                    f"{str(session_id)}.{str(test_id)}_*.csv"
+                ))
+                for path in test_result_paths:
+                    os.remove(path)
+
+
+            temp_file_path = BytesIO()
+            lines = read_gt_csv_file(file_location)
+            lines = [[x[1],x[-8:]] for x in lines if x[1].strip("\n\t\"',.") != ""]
+            try:
+                    round_pos = int(round_id) * int(metadata["round_size"])
+            except KeyError:
+                    raise RoundError(
+                        "no_defined_rounds",
+                        f"round_size not defined in metadata for test id {test_id}",
+                        traceback.format_stack(),
+                    )
+            if round_pos >= len(lines):
+                return None
+
+            # text = ('\n'.join(lines[round_pos:round_pos + int(metadata["round_size"])]) + "\n").encode('utf-8')
+            text = str(lines[round_pos:round_pos + int(metadata["round_size"])]).encode('utf-8')
+            temp_file_path.write(text)
+            temp_file_path.seek(0)
+        else:
+            temp_file_path = open(file_location, 'rb')
+
+        log_session(
+            self.results_folder,
+            session_id,
+            test_id=test_id,
+            round_id=round_id,
+            activity="data_request",
+        )
+
+        return temp_file_path
