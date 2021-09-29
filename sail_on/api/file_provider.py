@@ -1169,7 +1169,7 @@ class FileProviderSVO(FileProvider):
 
             temp_file_path = BytesIO()
             lines = read_gt_csv_file(file_location)
-            lines = [[x[1],x[-8:]] for x in lines if x[1].strip("\n\t\"',.") != ""]
+            lines = [[x[1],x[-9:-1]] for x in lines if x[1].strip("\n\t\"',.") != ""]
             try:
                     round_pos = int(round_id) * int(metadata["round_size"])
             except KeyError:
