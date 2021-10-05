@@ -639,7 +639,7 @@ class TestApi(unittest.TestCase):
         )
 
         _check_response(response)
-        expected = "0,1,this is great,5,2\n1,0,this is bad,1,4\n2,0,this is alright,3,1\n3,1,this is meh,2,6\n"
+        expected = "0,1,|this is great|,5,2\n1,0,|this is bad|,1,4\n2,0,|this is alright|,3,1\n3,1,|this is meh|,2,6\n"
         actual = response.content.decode("utf-16")
         self.assertEqual(expected, actual)
 
