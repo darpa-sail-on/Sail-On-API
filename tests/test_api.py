@@ -379,6 +379,46 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
+    def test_get_feedback_detection(self):
+        """Test get_feedback for var with type detection."""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_ids": "|".join(
+                    ["abcde.mp4", "fghij.mp4"]),
+                "feedback_type": ProtocolConstants.DETECTION,
+                "session_id": "get_feedback_var",
+                "test_id": "OND.1.1.1234",
+                "round_id": 0,
+            },
+        )
+
+        _check_response(response)
+
+        expected = "abcde.mp4,0\nfghij.mp4,1\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
+    def test_get_feedback_detection_failed(self):
+        """Test get_feedback fails for var with type detection due to lack of hint"""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_ids": "|".join(
+                    ["abcde.mp4", "fghij.mp4"]),
+                "feedback_type": ProtocolConstants.DETECTION,
+                "session_id": "get_feedback_detection_failed",
+                "test_id": "OND.1.1.1234",
+                "round_id": 0,
+            },
+        )
+
+        _check_response(response)
+
+        expected = ""
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
     def noused_test_get_feedback_psuedo_classification(self):
         """Test getting psuedo labels for given ids"""
         response = get(
