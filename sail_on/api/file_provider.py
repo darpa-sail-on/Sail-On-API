@@ -472,7 +472,8 @@ class FileProvider(Provider):
             "max_novel_classes",
             "round_size",
             "feedback_max_ids",
-            "pre_novelty_batches"
+            "pre_novelty_batches",
+            'pre_novelty_training'
         ]
 
         hints = info.get('hints',[])
