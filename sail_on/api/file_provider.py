@@ -671,6 +671,12 @@ class FileProvider(Provider):
                     traceback.format_stack(),
                 )
 
+        is_given_detection_mode = 'red_light' in structure["created"].get('hints', [])
+        budgeted_feedback = feedback_definition['budgeted_feedback'] and not \
+        (feedback_type ==  ProtocolConstants.DETECTION and is_given_detection_mode)
+
+        if not budgeted_feedback:
+            feedback_ids = []
 
         try:
             # Gets the amount of ids already requested for this type of feedback this round and
@@ -734,7 +740,7 @@ class FileProvider(Provider):
                         detection_lines = [x for x in d_reader]
                     predictions = [float(x[1]) for x in detection_lines]
                     # if given detection and past the detection point
-                    is_given = 'red_light' in structure["created"].get('hints',[]) and metadata.get('red_light') in [x[0] for x in detection_lines]
+                    is_given = is_given_detection_mode and metadata.get('red_light') in [x[0] for x in detection_lines]
                     if max(predictions) <= structure["created"]["detection_threshold"] and not is_given:
                         if detection_requirement == ProtocolConstants.NOTIFY_AND_CONTINUE:
                             logging.error("Inform TA2 team that they are requesting feedback prior to the threshold indication")
@@ -787,7 +793,7 @@ class FileProvider(Provider):
         number_of_ids_to_return = len(feedback)
 
         # if budgeted, decrement use and check if too many has been requested
-        if feedback_definition['budgeted_feedback']:
+        if budgeted_feedback:
             left_over_ids = int(metadata.get("feedback_max_ids", 0)) - feedback_count
             number_of_ids_to_return = min(number_of_ids_to_return, left_over_ids)
         feedback_count+=number_of_ids_to_return
