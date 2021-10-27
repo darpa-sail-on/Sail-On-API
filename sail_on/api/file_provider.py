@@ -371,7 +371,7 @@ def nlt_score_feedback(
 ) -> Dict[str, Any]:
     """Calculates and returns the score feedback for tests in the nlt domain"""
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata)
-    with open(result_files[0], "r", encoding=get_encoding(metadata["domain"])) as rf:
+    with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, None, metadata)
     
@@ -868,9 +868,9 @@ class FileProvider(Provider):
         feedback_csv = BytesIO()
         for key in feedback.keys():
             if type(feedback[key]) is not list:
-                feedback_csv.write(f"{key},{feedback[key]}\n".encode(get_encoding(domain)))
+                feedback_csv.write(f"{key},{feedback[key]}\n")
             else:
-                feedback_csv.write(f"{key},{','.join(str(x) for x in feedback[key])}\n".encode(get_encoding(domain)))
+                feedback_csv.write(f"{key},{','.join(str(x) for x in feedback[key])}\n")
             number_of_ids_to_return-=1
             # once maximium requested number is hit, quit
             if number_of_ids_to_return == 0:
