@@ -34,7 +34,7 @@ def read_gt_csv_file(file_location, domain):
 
 @cached(cache=LRUCache(maxsize=128))
 def read_meta_data(file_location, domain):
-    with open(file_location, "r", encoding=get_encoding(domain)) as md:
+    with open(file_location, "r") as md:
         return json.load(md)
 
 # Returns the encoding for the specified domain
@@ -370,7 +370,7 @@ def nlt_score_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns the score feedback for tests in the nlt domain"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), None, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, None, metadata)
