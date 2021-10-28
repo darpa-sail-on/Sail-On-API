@@ -868,9 +868,9 @@ class FileProvider(Provider):
         feedback_csv = BytesIO()
         for key in feedback.keys():
             if type(feedback[key]) is not list:
-                feedback_csv.write(f"{key},{feedback[key]}\n")
+                feedback_csv.write(f"{key},{feedback[key]}\n".encode('utf-8'))
             else:
-                feedback_csv.write(f"{key},{','.join(str(x) for x in feedback[key])}\n")
+                feedback_csv.write(f"{key},{','.join(str(x) for x in feedback[key])}\n".encode('utf-8'))
             number_of_ids_to_return-=1
             # once maximium requested number is hit, quit
             if number_of_ids_to_return == 0:

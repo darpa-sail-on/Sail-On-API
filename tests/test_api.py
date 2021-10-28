@@ -658,7 +658,7 @@ class TestApi(unittest.TestCase):
 
         _check_response(response)
         expected = "current_score,8\n"
-        actual = response.content.decode("utf-16")
+        actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
 
@@ -698,8 +698,8 @@ class TestApi(unittest.TestCase):
         )
 
         _check_response(response)
-        expected = "0,1\n\ufeff1,0\n\ufeff2,1\n"
-        actual = response.content.decode("utf-16")
+        expected = "0,1\n1,0\n2,1\n"
+        actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
 
