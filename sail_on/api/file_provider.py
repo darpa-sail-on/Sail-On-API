@@ -586,7 +586,7 @@ class FileProvider(Provider):
                 "columns": [0],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
-                "required_hints": ["novelty_instance_detection"]
+                "required_hints": []
             }
         },
         "transcripts" : {
@@ -633,7 +633,7 @@ class FileProvider(Provider):
                 "columns": [1],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
-                "required_hints": ["novelty_instance_detection"]
+                "required_hints": []
             }
         }
     }
