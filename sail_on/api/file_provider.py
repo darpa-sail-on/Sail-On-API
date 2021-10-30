@@ -209,6 +209,21 @@ def get_classification_var_feedback(
         for x in ground_truth.keys()
     }
 
+def get_detection_feedback(
+    gt_file: str,
+    result_files: List[str],
+    feedback_ids: List[str],
+    metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Grabs and returns"""
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)
+
+    return {
+        x: ground_truth[x][metadata["columns"][0]]
+        for x in ground_truth.keys()
+    }
+
 def get_classificaton_score_feedback(
         gt_file: str,
         result_files: List[str],
@@ -564,6 +579,14 @@ class FileProvider(Provider):
                 "columns": [1],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": False
+            },
+            ProtocolConstants.DETECTION: {
+                "function": get_detection_feedback,
+                "files": [ProtocolConstants.DETECTION],
+                "columns": [0],
+                "detection_req": ProtocolConstants.SKIP,
+                "budgeted_feedback": True,
+                "required_hints": []
             }
         },
         "transcripts" : {
@@ -603,6 +626,14 @@ class FileProvider(Provider):
                 "columns": [2],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": False
+            },
+            ProtocolConstants.DETECTION: {
+                "function": get_detection_feedback,
+                "files": [ProtocolConstants.DETECTION],
+                "columns": [1],
+                "detection_req": ProtocolConstants.SKIP,
+                "budgeted_feedback": True,
+                "required_hints": []
             }
         }
     }
@@ -640,6 +671,12 @@ class FileProvider(Provider):
                     traceback.format_stack(),
                 )
 
+        is_given_detection_mode = 'red_light' in structure["created"].get('hints', [])
+        budgeted_feedback = feedback_definition['budgeted_feedback'] and not \
+        (feedback_type ==  ProtocolConstants.DETECTION and is_given_detection_mode)
+
+        if not budgeted_feedback:
+            feedback_ids = []
 
         try:
             # Gets the amount of ids already requested for this type of feedback this round and
@@ -677,6 +714,14 @@ class FileProvider(Provider):
                     traceback.format_stack(),
                 )
 
+        # Ensure any required hint(s) are present in the session info structure
+        req_hints = feedback_definition.get("required_hints", [])
+        if len(req_hints) > 0:
+            for hint in req_hints:
+                if hint not in structure["created"].get('hints',[]):
+                    logging.warning("Inform TA2 team that they are requesting feedback prior to the threshold indication")
+                    return BytesIO()
+
         detection_requirement = feedback_definition.get("detection_req", ProtocolConstants.IGNORE)
 
         # If novelty detection is required, ensure detection has been posted 
@@ -695,7 +740,7 @@ class FileProvider(Provider):
                         detection_lines = [x for x in d_reader]
                     predictions = [float(x[1]) for x in detection_lines]
                     # if given detection and past the detection point
-                    is_given = 'red_light' in structure.get('hints',[]) and metadata.get('red_light') in [x[0] for x in detection_lines]
+                    is_given = is_given_detection_mode and metadata.get('red_light') in [x[0] for x in detection_lines]
                     if max(predictions) <= structure["created"]["detection_threshold"] and not is_given:
                         if detection_requirement == ProtocolConstants.NOTIFY_AND_CONTINUE:
                             logging.error("Inform TA2 team that they are requesting feedback prior to the threshold indication")
@@ -748,7 +793,7 @@ class FileProvider(Provider):
         number_of_ids_to_return = len(feedback)
 
         # if budgeted, decrement use and check if too many has been requested
-        if feedback_definition['budgeted_feedback']:
+        if budgeted_feedback:
             left_over_ids = int(metadata.get("feedback_max_ids", 0)) - feedback_count
             number_of_ids_to_return = min(number_of_ids_to_return, left_over_ids)
         feedback_count+=number_of_ids_to_return
