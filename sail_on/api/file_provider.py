@@ -586,7 +586,8 @@ class FileProvider(Provider):
                 "columns": [0],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
-                "required_hints": []
+                "required_hints": [],
+                "alternate_budget": "max_detection_feedback_ids"
             }
         },
         "transcripts" : {
@@ -633,7 +634,8 @@ class FileProvider(Provider):
                 "columns": [1],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
-                "required_hints": []
+                "required_hints": [],
+                "alternate_budget": "max_detection_feedback_ids"
             }
         }
     }
@@ -675,6 +677,11 @@ class FileProvider(Provider):
         budgeted_feedback = feedback_definition['budgeted_feedback'] and not \
         (feedback_type ==  ProtocolConstants.DETECTION and is_given_detection_mode)
 
+        if "alternate_budget" in  feedback_definition and feedback_definition["alternate_budget"] in metadata:
+            feedback_budget = int(metadata[feedback_definition["alternate_budget"]])
+        else:
+            feedback_budget = int(metadata.get("feedback_max_ids",0))
+
         if not budgeted_feedback:
             feedback_ids = []
 
@@ -684,7 +691,7 @@ class FileProvider(Provider):
             feedback_round_id = str(max([int(r) for r in test_structure["post_results"]["rounds"].keys()]))
 
             feedback_count = test_structure["get_feedback"]["rounds"][feedback_round_id].get(feedback_type, 0)
-            if feedback_count >= metadata["feedback_max_ids"]:
+            if feedback_count >= feedback_budget:
                 raise ProtocolError(
                     "FeedbackBudgetExceeded",
                     f"Feedback of type {feedback_type} has already been requested on the maximum number of ids"
@@ -794,7 +801,7 @@ class FileProvider(Provider):
 
         # if budgeted, decrement use and check if too many has been requested
         if budgeted_feedback:
-            left_over_ids = int(metadata.get("feedback_max_ids", 0)) - feedback_count
+            left_over_ids = feedback_budget - feedback_count
             number_of_ids_to_return = min(number_of_ids_to_return, left_over_ids)
         feedback_count+=number_of_ids_to_return
 
@@ -805,7 +812,7 @@ class FileProvider(Provider):
             activity="get_feedback",
             test_id=test_id,
             round_id=feedback_round_id,
-            content={feedback_type: feedback_count},
+            content={feedback_type: feedback_count, feedback_budget: feedback_budget},
         )
 
         feedback_csv = BytesIO()
