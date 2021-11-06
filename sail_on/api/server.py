@@ -322,6 +322,7 @@ def get_feedback() -> Response:
         round_id =  data.get("round_id",'last')
         feedback_types = data["feedback_type"].split("|")
         feedback_ids = data.get("feedback_ids", "")
+        feedback_category = data.get("feedback_category", "")
         if feedback_ids == "":
             feedback_ids = None
         else:
@@ -339,7 +340,7 @@ def get_feedback() -> Response:
     try:
         responses = {}
         for f_type in feedback_types:
-            responses[f_type] = Binder.provider.get_feedback(feedback_ids, f_type, session_id, test_id)
+            responses[f_type] = Binder.provider.get_feedback(feedback_ids, f_type, session_id, test_id, feedback_category)
     except RoundError as e:
         raise e
     except ServerError as e:

@@ -15,10 +15,19 @@ All other commands should be run within the pipenv shell or pipenv envronment.
 ### Running the sail-on api
 
 To run the API locally, use the following command:
-   `sail_on_server --data-directory data/ --results-directory results`
+   `sail_on_server --url 192.168.34.9:8102 --data-directory ./tests/data --results-directory ./test/results/dryrun/tmptmp/`
 
 To use a different port you can add the following optional paramater:
    `--url localhost:12345`
+
+### Running the sail-on client
+
+`git clone https://github.com/pi-umd/sailon-svo/tree/sonaal`
+`cd sailon-svo`
+
+To run the client, use the following command:
+   `python main.py --url http://192.168.34.9:8102 --protocol SVO --batch_size 4 --image_directory /fs/vulcan-projects/sailon_root/sailon_data --results_directory . --config svg.yaml --feedback`
+
 
 ## Data Generation/Evalutation Service
 
