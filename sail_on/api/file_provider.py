@@ -1209,7 +1209,7 @@ class FileProviderSVO(FileProvider):
                                         ProtocolConstants.CLASSIFICATION:  {
                                             "function": get_classification_feedback_topk,
                                             "files": [ProtocolConstants.CLASSIFICATION ],
-                                            "columns": {"subject" : [2], "verb" : [8], "object" : [5]}, # HARDCODE: Index of S,V,O in ground truth
+                                            "columns": {"subject" : [3], "verb" : [9], "object" : [6]}, # HARDCODE: Index of S,V,O in ground truth
                                             "detection_req": ProtocolConstants.NOTIFY_AND_CONTINUE,
                                             "budgeted_feedback": True
                                         },
