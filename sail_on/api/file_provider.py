@@ -215,11 +215,12 @@ def get_classification_feedback_topk(
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
     
     topk = read_feedback_file(read_gt_csv_file(topk_file, with_header=True), None, metadata,
-                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)
+                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)  
     return {
-        x: topk[ground_truth[x][metadata["columns"][0] - 1]] 
+        x: topk[int(ground_truth[x][metadata["columns"][0] - 1])] 
         for x in ground_truth.keys()
     }
+
 
 def get_classification_var_feedback(
     gt_file: str,
@@ -1262,7 +1263,7 @@ class FileProviderSVO(FileProvider):
             temp_file_path = BytesIO()
             lines = read_gt_csv_file(file_location)
             # HARDCODED 
-            lines = [[x[0],x[-10:-2]] for x in lines if x[0].strip("\n\t\"',.") != ""]
+            lines = [[x[0],x[-9:-1]] for x in lines if x[0].strip("\n\t\"',.") != ""]
             try:
                     round_pos = int(round_id) * int(metadata["round_size"])
             except KeyError:
@@ -1349,7 +1350,7 @@ class FileProviderSVO(FileProvider):
                 )
         except KeyError:
             feedback_count = 0
-            print(f"FC : {feedback_count}, FCAT : {feedback_category}, FR : {feedback_round_id}")
+            # print(f"FC : {feedback_count}, FCAT : {feedback_category}, FR : {feedback_round_id}")
 
 
         ground_truth_file = os.path.join(self.folder, metadata["protocol"], domain, f"{test_id}_single_df.csv")
