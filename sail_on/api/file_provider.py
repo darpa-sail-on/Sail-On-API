@@ -585,7 +585,7 @@ class FileProvider(Provider):
             lines = read_gt_csv_file(file_location, info["domain"])
             # Get a variety of data for NLT domain, or just id for all other domains
             if info["domain"] == "nlt":
-                lines = [f"{x[0]},{x[2]},|||,{x[4]},{x[5]}".replace("|||", f"|{x[1]}|".strip('\n\t\r')) for x in lines if x[0].strip("\n\t\"',.") != ""]
+                lines = [f"{x[0]},{x[2]},|||,{x[4]},{x[5]}".replace("|||", f"|{x[1].replace('|', '||')}|".strip('\n\t\r')) for x in lines if x[0].strip("\n\t\"',.") != ""]
             else:
                 lines = [x[0] for x in lines if x[0].strip("\n\t\"',.") != ""]
             try:
