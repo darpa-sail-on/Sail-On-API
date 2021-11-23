@@ -429,7 +429,7 @@ class FileProvider(Provider):
             if '=' in hint_data:
                 parts = hint_data.split('=')
                 if parts[0] in approved_metadata:
-                    overrides[parts[0]] = int(parts[0])
+                    overrides[parts[0]] = int(parts[1])
 
         md = read_meta_data(metadata_location)
         md.update(overrides)
