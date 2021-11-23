@@ -416,14 +416,23 @@ class FileProvider(Provider):
             "max_novel_classes",
             "round_size",
             "feedback_max_ids",
-            "pre_novelty_batches"
+            "pre_novelty_batches",
+            "max_detection_feedback_ids"
         ]
 
         hints = info.get('hints',[])
 
         approved_metadata.extend([data for data in ["red_light"] if data in hints])
 
+        overrides = {}
+        for hint_data in hints:
+            if '=' in hint_data:
+                parts = hint_data.split('=')
+                if parts[0] in approved_metadata:
+                    overrides[parts[0]] = int(parts[0])
+
         md = read_meta_data(metadata_location)
+        md.update(overrides)
         if api_call:
                 return {
                     k: v for k, v in md.items() if k in approved_metadata
