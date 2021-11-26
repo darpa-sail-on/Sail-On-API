@@ -158,7 +158,7 @@ def read_feedback_file(
             traceback.format_stack(),
         )
 
-    if not feedback_ids:
+    if feedback_ids:
         return {
             x[0]: [n for n in x[1:]]
             for x in [[n.strip(" \"'") for n in y] for y in lines][start:end]
