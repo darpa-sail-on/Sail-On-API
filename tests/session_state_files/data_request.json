@@ -4,6 +4,7 @@
     "protocol": "OND",
     "domain": "transcripts",
     "detector": "0.1.1",
-    "detection_threshold": 0.1
+    "detection_threshold": 0.1,
+    "hints": ["red_light", "feedback_max_ids=32"]
   }
 }

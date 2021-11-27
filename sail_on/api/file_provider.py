@@ -27,10 +27,13 @@ from io import BytesIO
 from cachetools import LRUCache, cached
 
 @cached(cache=LRUCache(maxsize=32))
-def read_gt_csv_file(file_location):
+def read_gt_csv_file(file_location, line_constraint=None):
     with open(file_location, "r") as f:
         csv_reader = csv.reader(f, delimiter=",", quotechar='|')
-        return [x for x in csv_reader][1:]
+        if line_constraint:
+            return [x for x in csv_reader][1:line_constraint+1]
+        else:
+            return [x for x in csv_reader][1:]
 
 @cached(cache=LRUCache(maxsize=128))
 def read_meta_data(file_location):
@@ -201,7 +204,11 @@ def get_classification_var_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Grabs and returns"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+    with open(result_files[0], "r") as rf:
+            result_reader = csv.reader(rf, delimiter=",")
+            results = read_feedback_file(result_reader, None, metadata, check_constrained=feedback_ids is None or len(feedback_ids) == 0)
+
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, len(results)), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     return {
@@ -216,7 +223,11 @@ def get_detection_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Grabs and returns"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+    with open(result_files[0], "r") as rf:
+            result_reader = csv.reader(rf, delimiter=",")
+            results = read_feedback_file(result_reader, None, metadata, check_constrained=feedback_ids is None or len(feedback_ids) == 0)
+
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, len(results)), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     return {
@@ -231,11 +242,11 @@ def get_classificaton_score_feedback(
         metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns feedback on the accuracy of classification"""
-
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), None, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
-        result_reader = csv.reader(rf, delimiter=",")
-        results = read_feedback_file(result_reader, None, metadata, check_constrained=False)
+            result_reader = csv.reader(rf, delimiter=",")
+            results = read_feedback_file(result_reader, None, metadata, check_constrained=False)
+
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, len(results)), None, metadata, check_constrained=False)
 
     # Go through results and count number correct
     num_correct = 0
@@ -640,7 +651,7 @@ class FileProvider(Provider):
             ProtocolConstants.DETECTION: {
                 "function": get_detection_feedback,
                 "files": [ProtocolConstants.DETECTION],
-                "columns": [1],
+                "columns": [0],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
                 "required_hints": [],
