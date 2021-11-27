@@ -216,6 +216,13 @@ def get_detection_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Grabs and returns"""
+    if (feedback_ids is None or len(feedback_ids) == 0):
+        # if feedback ids not provided, limit to those in the last round
+        with open(result_files[0], "r") as rf:
+            result_reader = csv.reader(rf, delimiter=",")
+            results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
+            feedback_ids = list(results.keys())
+
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
