@@ -640,7 +640,7 @@ class FileProvider(Provider):
             ProtocolConstants.DETECTION: {
                 "function": get_detection_feedback,
                 "files": [ProtocolConstants.DETECTION],
-                "columns": [1],
+                "columns": [0],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
                 "required_hints": [],
