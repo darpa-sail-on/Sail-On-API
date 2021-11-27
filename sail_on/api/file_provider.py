@@ -691,9 +691,6 @@ class FileProvider(Provider):
         else:
             feedback_budget = int(metadata.get("feedback_max_ids",0))
 
-        if not budgeted_feedback:
-            feedback_ids = []
-
         try:
             # Gets the amount of ids already requested for this type of feedback this round and
             # determines whether the limit has already been reached
