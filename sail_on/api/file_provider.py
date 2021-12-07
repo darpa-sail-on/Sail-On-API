@@ -216,6 +216,13 @@ def get_detection_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Grabs and returns"""
+    if (feedback_ids is None or len(feedback_ids) == 0):
+        # if feedback ids not provided, limit to those in the last round
+        with open(result_files[0], "r") as rf:
+            result_reader = csv.reader(rf, delimiter=",")
+            results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
+            feedback_ids = list(results.keys())
+
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
@@ -640,7 +647,7 @@ class FileProvider(Provider):
             ProtocolConstants.DETECTION: {
                 "function": get_detection_feedback,
                 "files": [ProtocolConstants.DETECTION],
-                "columns": [1],
+                "columns": [0],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
                 "required_hints": [],
@@ -690,9 +697,6 @@ class FileProvider(Provider):
             feedback_budget = int(metadata[feedback_definition["alternate_budget"]])
         else:
             feedback_budget = int(metadata.get("feedback_max_ids",0))
-
-        if not budgeted_feedback:
-            feedback_ids = []
 
         try:
             # Gets the amount of ids already requested for this type of feedback this round and
