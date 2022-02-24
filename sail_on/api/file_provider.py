@@ -212,7 +212,7 @@ def get_kinetics_labels_var_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Grabs and returns"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     return {
@@ -234,7 +234,7 @@ def get_single_gt_feedback(
             results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
             feedback_ids = list(results.keys())
 
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     return {
@@ -687,7 +687,7 @@ class FileProvider(Provider):
                 "budgeted_feedback": False
             },
             ProtocolConstants.DETECTION: {
-                "function": get_detection_feedback,
+                "function": get_single_gt_feedback,
                 "files": [ProtocolConstants.DETECTION],
                 "columns": [0],
                 "detection_req": ProtocolConstants.SKIP,
