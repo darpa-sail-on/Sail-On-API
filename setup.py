@@ -33,8 +33,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
     ],
-    description="""Framework for deploying and evaluating novelty detection
-                    algorithms for DARPA Sail-On.""",
+    description="""Framework for deploying and evaluating novelty detection algorithms for DARPA Sail-On.""",
     long_description=readme + "\n\n" + history,
     include_package_data=True,
     name="sail-on",

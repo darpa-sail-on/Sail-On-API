@@ -189,8 +189,6 @@ def get_classification_feedback(
         metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for classification type feedback"""
-
-
     if (feedback_ids is None or len(feedback_ids) == 0):
         # if feedback ids not provided, limit to those in the last round
         with open(result_files[0], "r") as rf:
@@ -207,6 +205,42 @@ def get_classification_feedback(
         for x in ground_truth.keys()
     }
 
+def get_kinetics_labels_var_feedback(
+    gt_file: str,
+    result_files: List[str],
+    feedback_ids: List[str],
+    metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Grabs and returns"""
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)
+
+    return {
+        x: ground_truth[x][metadata["columns"][0]:metadata["columns"][1]]
+        for x in ground_truth.keys()
+    }
+
+def get_single_gt_feedback(
+    gt_file: str,
+    result_files: List[str],
+    feedback_ids: List[str],
+    metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Grabs and returns specified column"""
+    if (feedback_ids is None or len(feedback_ids) == 0):
+        # if feedback ids not provided, limit to those in the last round
+        with open(result_files[0], "r") as rf:
+            result_reader = csv.reader(rf, delimiter=",")
+            results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
+            feedback_ids = list(results.keys())
+
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)
+
+    return {
+        x: ground_truth[x][metadata["columns"][0]]
+        for x in ground_truth.keys()
+    }
 
 def get_classificaton_score_feedback(
         gt_file: str,
@@ -473,14 +507,23 @@ class FileProvider(Provider):
             "round_size",
             "feedback_max_ids",
             "pre_novelty_batches",
-            'pre_novelty_training'
+            "pre_novelty_training",
+            "max_detection_feedback_ids"
         ]
 
         hints = info.get('hints',[])
 
         approved_metadata.extend([data for data in ["red_light"] if data in hints])
 
+        overrides = {}
+        for hint_data in hints:
+            if '=' in hint_data:
+                parts = hint_data.split('=')
+                if parts[0] in approved_metadata:
+                    overrides[parts[0]] = int(parts[1])
+
         md = read_meta_data(metadata_location, info["domain"])
+        md.update(overrides)
         if api_call:
                 return {
                     k: v for k, v in md.items() if k in approved_metadata
@@ -642,6 +685,15 @@ class FileProvider(Provider):
                 "columns": [1],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": False
+            },
+            ProtocolConstants.DETECTION: {
+                "function": get_detection_feedback,
+                "files": [ProtocolConstants.DETECTION],
+                "columns": [0],
+                "detection_req": ProtocolConstants.SKIP,
+                "budgeted_feedback": True,
+                "required_hints": [],
+                "alternate_budget": "max_detection_feedback_ids"
             }
         },
         "transcripts" : {
@@ -668,8 +720,16 @@ class FileProvider(Provider):
             }
         },
         "activity_recognition" : {
+            #Discontinued kinetics label feedback
+            ProtocolConstants.LABELS:  {
+                "function": get_kinetics_labels_var_feedback,
+                "files": [ProtocolConstants.CLASSIFICATION],
+                "columns": [5, 10],
+                "detection_req": ProtocolConstants.SKIP,
+                "budgeted_feedback": True
+            },
             ProtocolConstants.CLASSIFICATION:  {
-                "function": get_classification_feedback,
+                "function": get_single_gt_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [2],
                 "detection_req": ProtocolConstants.SKIP,
@@ -681,6 +741,15 @@ class FileProvider(Provider):
                 "columns": [2],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": False
+            },
+            ProtocolConstants.DETECTION: {
+                "function": get_single_gt_feedback,
+                "files": [ProtocolConstants.DETECTION],
+                "columns": [0],
+                "detection_req": ProtocolConstants.SKIP,
+                "budgeted_feedback": True,
+                "required_hints": [],
+                "alternate_budget": "max_detection_feedback_ids"
             }
         },
         "nlt": {
@@ -736,6 +805,14 @@ class FileProvider(Provider):
                     traceback.format_stack(),
                 )
 
+        is_given_detection_mode = 'red_light' in structure["created"].get('hints', [])
+        budgeted_feedback = feedback_definition['budgeted_feedback'] and not \
+        (feedback_type ==  ProtocolConstants.DETECTION and is_given_detection_mode)
+
+        if "alternate_budget" in  feedback_definition and feedback_definition["alternate_budget"] in metadata:
+            feedback_budget = int(metadata[feedback_definition["alternate_budget"]])
+        else:
+            feedback_budget = int(metadata.get("feedback_max_ids",0))
 
         try:
             # Gets the amount of ids already requested for this type of feedback this round and
@@ -743,7 +820,7 @@ class FileProvider(Provider):
             feedback_round_id = str(max([int(r) for r in test_structure["post_results"]["rounds"].keys()]))
 
             feedback_count = test_structure["get_feedback"]["rounds"][feedback_round_id].get(feedback_type, 0)
-            if feedback_count >= metadata["feedback_max_ids"]:
+            if feedback_count >= feedback_budget:
                 raise ProtocolError(
                     "FeedbackBudgetExceeded",
                     f"Feedback of type {feedback_type} has already been requested on the maximum number of ids"
@@ -773,6 +850,14 @@ class FileProvider(Provider):
                     traceback.format_stack(),
                 )
 
+        # Ensure any required hint(s) are present in the session info structure
+        req_hints = feedback_definition.get("required_hints", [])
+        if len(req_hints) > 0:
+            for hint in req_hints:
+                if hint not in structure["created"].get('hints',[]):
+                    logging.warning("Inform TA2 team that they are requesting feedback prior to the threshold indication")
+                    return BytesIO()
+
         detection_requirement = feedback_definition.get("detection_req", ProtocolConstants.IGNORE)
 
         # If novelty detection is required, ensure detection has been posted 
@@ -791,7 +876,7 @@ class FileProvider(Provider):
                         detection_lines = [x for x in d_reader]
                     predictions = [float(x[1]) for x in detection_lines]
                     # if given detection and past the detection point
-                    is_given = 'red_light' in structure.get('hints',[]) and metadata.get('red_light') in [x[0] for x in detection_lines]
+                    is_given = is_given_detection_mode and metadata.get('red_light') in [x[0] for x in detection_lines]
                     if max(predictions) <= structure["created"]["detection_threshold"] and not is_given:
                         if detection_requirement == ProtocolConstants.NOTIFY_AND_CONTINUE:
                             logging.error("Inform TA2 team that they are requesting feedback prior to the threshold indication")
@@ -850,8 +935,8 @@ class FileProvider(Provider):
         number_of_ids_to_return = len(feedback)
 
         # if budgeted, decrement use and check if too many has been requested
-        if feedback_definition['budgeted_feedback']:
-            left_over_ids = int(metadata.get("feedback_max_ids", 0)) - feedback_count
+        if budgeted_feedback:
+            left_over_ids = feedback_budget - feedback_count
             number_of_ids_to_return = min(number_of_ids_to_return, left_over_ids)
         feedback_count+=number_of_ids_to_return
 
@@ -862,7 +947,7 @@ class FileProvider(Provider):
             activity="get_feedback",
             test_id=test_id,
             round_id=feedback_round_id,
-            content={feedback_type: feedback_count},
+            content={feedback_type: feedback_count, feedback_budget: feedback_budget},
         )
 
         feedback_csv = BytesIO()
