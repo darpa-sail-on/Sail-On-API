@@ -194,7 +194,7 @@ def get_classification_feedback(
         for x in ground_truth.keys()
     }
 
-def get_classification_var_feedback(
+def get_kinetics_labels_var_feedback(
     gt_file: str,
     result_files: List[str],
     feedback_ids: List[str],
@@ -209,13 +209,13 @@ def get_classification_var_feedback(
         for x in ground_truth.keys()
     }
 
-def get_detection_feedback(
+def get_single_gt_feedback(
     gt_file: str,
     result_files: List[str],
     feedback_ids: List[str],
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
-    """Grabs and returns"""
+    """Grabs and returns specified column"""
     if (feedback_ids is None or len(feedback_ids) == 0):
         # if feedback ids not provided, limit to those in the last round
         with open(result_files[0], "r") as rf:
@@ -630,10 +630,18 @@ class FileProvider(Provider):
             }
         },
         "activity_recognition" : {
-            ProtocolConstants.CLASSIFICATION:  {
-                "function": get_classification_var_feedback,
+            #Discontinued kinetics label feedback
+            ProtocolConstants.LABELS:  {
+                "function": get_kinetics_labels_var_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [5, 10],
+                "detection_req": ProtocolConstants.SKIP,
+                "budgeted_feedback": True
+            },
+            ProtocolConstants.CLASSIFICATION:  {
+                "function": get_single_gt_feedback,
+                "files": [ProtocolConstants.CLASSIFICATION],
+                "columns": [2],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True
             },
@@ -645,7 +653,7 @@ class FileProvider(Provider):
                 "budgeted_feedback": False
             },
             ProtocolConstants.DETECTION: {
-                "function": get_detection_feedback,
+                "function": get_single_gt_feedback,
                 "files": [ProtocolConstants.DETECTION],
                 "columns": [0],
                 "detection_req": ProtocolConstants.SKIP,

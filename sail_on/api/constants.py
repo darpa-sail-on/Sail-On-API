@@ -8,6 +8,7 @@ class ProtocolConstants:
     SPATIAL = "spatial"
     PSUEDO_CLASSIFICATION = "psuedo_labels_classification"
     SCORE = "score"
+    LABELS = "labels"
 
     # Detection requirement
     REQUIRED = "REQUIRED"
