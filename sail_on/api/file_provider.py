@@ -27,15 +27,26 @@ from io import BytesIO
 from cachetools import LRUCache, cached
 
 @cached(cache=LRUCache(maxsize=32))
-def read_gt_csv_file(file_location):
-    with open(file_location, "r") as f:
+def read_gt_csv_file(file_location, domain):
+    with open(file_location, "r", encoding=get_encoding(domain)) as f:
         csv_reader = csv.reader(f, delimiter=",", quotechar='|')
         return [x for x in csv_reader][1:]
 
 @cached(cache=LRUCache(maxsize=128))
-def read_meta_data(file_location):
+def read_meta_data(file_location, domain):
     with open(file_location, "r") as md:
         return json.load(md)
+
+# Returns the encoding for the specified domain
+def get_encoding(domain: str):
+    if domain == "nlt":
+        return ProtocolConstants.NLT_ENCODING
+    elif domain == "activity_recognition":
+        return ProtocolConstants.VAR_ENCODING
+    elif domain == "transcripts":
+        return ProtocolConstants.WTR_ENCODING
+    else:
+        return "utf-8"
 
 # region Session log related functions
 def get_session_info(folder: str, session_id: str, in_process_only: bool = True) -> Dict[str, Any]:
@@ -186,7 +197,7 @@ def get_classification_feedback(
             feedback_max_ids = min(metadata.get('feedback_max_ids',len(results)),len(results))
             feedback_ids = list(results.keys())[:int(feedback_max_ids)]
 
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     return {
@@ -201,7 +212,7 @@ def get_kinetics_labels_var_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Grabs and returns"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     return {
@@ -223,7 +234,7 @@ def get_single_gt_feedback(
             results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
             feedback_ids = list(results.keys())
 
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
     return {
@@ -239,7 +250,7 @@ def get_classificaton_score_feedback(
 ) -> Dict[str, Any]:
     """Calculates and returns feedback on the accuracy of classification"""
 
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), None, metadata, check_constrained=False)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), None, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, None, metadata, check_constrained=False)
@@ -269,7 +280,7 @@ def get_characterization_feedback(
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata)
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata, check_constrained=False)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata, check_constrained=False)
 
 
     # If ground truth is not novel, returns 1 is prediction is correct, 
@@ -294,7 +305,7 @@ def get_levenshtein_feedback(
         metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for levenshtein type feedback"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata, check_constrained=False)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata)
@@ -317,7 +328,7 @@ def get_cluster_feedback(
         metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Calculates and returns the proper feedback for cluster type feedback"""
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata, check_constrained=False)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata, check_constrained=False)
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata)
@@ -360,7 +371,7 @@ def psuedo_label_feedback(
         session_id: str
 ) -> Dict[str, Any]:
     "Grabs psuedo label feedback for requested ids"
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata)
 
     structure = get_session_info(folder, session_id)
 
@@ -383,6 +394,78 @@ def psuedo_label_feedback(
 
     structure["psuedo_labels"][feedback_type] = labels
     write_session_log_file(structure, os.path.join(folder, f"{str(session_id)}.json"))
+
+    return return_dict
+
+def nlt_score_feedback(
+    gt_file: str,
+    result_files: List[str],
+    feedback_ids: List[str],
+    metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Calculates and returns the score feedback for tests in the nlt domain"""
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), None, metadata, check_constrained=False)
+    with open(result_files[0], "r") as rf:
+        result_reader = csv.reader(rf, delimiter=",")
+        results = read_feedback_file(result_reader, None, metadata)
+    
+    test_structure = get_session_test_info(metadata["folder"], metadata["session_id"], metadata["test_id"])
+
+    # Pull the current score from the session log or initialize it
+    if "current_score" in test_structure:
+        score_sect = test_structure["current_score"]
+    else:
+        score_sect = {"score": 0}
+
+    # calculate score for current round
+    score = score_sect["score"]
+    for id in results.keys():
+        if results[id][0] == '0':
+            if ground_truth[id][metadata["columns"][0]] != ground_truth[id][metadata["columns"][1]]:
+                score += 1
+        elif results[id][0] == '1':
+            if ground_truth[id][metadata["columns"][0]] == ground_truth[id][metadata["columns"][1]]:
+                score += 1
+        else:
+            raise ProtocolError("InvalidTuple", f"First var of tuple for {id} is not valid")
+        
+        if results[id][1] == ground_truth[id][metadata["columns"][1]]:
+            score += 1
+
+    # Save the score
+    score_sect["score"] = score
+    test_structure["current_score"] = score_sect
+    write_session_log_file(test_structure, os.path.join(
+        metadata["folder"], 
+        f"{str(metadata['session_id'])}.{str(metadata['test_id'])}.json")
+    )
+
+    return {"current_score": score}
+
+def nlt_labels_feedback(
+    gt_file: str,
+    result_files: List[str],
+    feedback_ids: List[str],
+    metadata: Dict[str, Any]
+) -> Dict[str, Any]:
+    "Returns the real writer id labels for specified instance ids in the nlt domain"
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata)
+    
+    return_dict = {
+        x: ground_truth[x][metadata["columns"][0]] for x in ground_truth.keys()
+    }
+
+    # Subtract 1 from the current score in the session test log
+    test_structure = get_session_test_info(metadata["folder"], metadata["session_id"], metadata["test_id"])
+    if "current_score" in test_structure:
+        test_structure["current_score"]["score"] -= len(feedback_ids)
+    else:
+        test_structure["current_score"] = {"score": (-1 * len(feedback_ids))}
+    
+    write_session_log_file(test_structure, os.path.join(
+        metadata["folder"], 
+        f"{str(metadata['session_id'])}.{str(metadata['test_id'])}.json")
+    )
 
     return return_dict
 
@@ -424,6 +507,7 @@ class FileProvider(Provider):
             "round_size",
             "feedback_max_ids",
             "pre_novelty_batches",
+            "pre_novelty_training",
             "max_detection_feedback_ids"
         ]
 
@@ -438,7 +522,7 @@ class FileProvider(Provider):
                 if parts[0] in approved_metadata:
                     overrides[parts[0]] = int(parts[1])
 
-        md = read_meta_data(metadata_location)
+        md = read_meta_data(metadata_location, info["domain"])
         md.update(overrides)
         if api_call:
                 return {
@@ -541,8 +625,12 @@ class FileProvider(Provider):
 
 
             temp_file_path = BytesIO()
-            lines = read_gt_csv_file(file_location)
-            lines = [x[0] for x in lines if x[0].strip("\n\t\"',.") != ""]
+            lines = read_gt_csv_file(file_location, info["domain"])
+            # Get a variety of data for NLT domain, or just id for all other domains
+            if info["domain"] == "nlt":
+                lines = [f"{x[0]},{x[2]},|||,{x[4]},{x[5]}".replace("|||", f"|{x[1].replace('|', '||')}|".strip('\n\t\r')) for x in lines if x[0].strip("\n\t\"',.") != ""]
+            else:
+                lines = [x[0] for x in lines if x[0].strip("\n\t\"',.") != ""]
             try:
                     round_pos = int(round_id) * int(metadata["round_size"])
             except KeyError:
@@ -554,7 +642,9 @@ class FileProvider(Provider):
             if round_pos >= len(lines):
                 return None
 
-            text = ('\n'.join(lines[round_pos:round_pos + int(metadata["round_size"])]) + "\n").encode('utf-8')
+            text = ('\n'.join(lines[round_pos:round_pos + int(metadata["round_size"])]) + "\n").encode(
+                get_encoding(info["domain"]))
+
             temp_file_path.write(text)
             temp_file_path.seek(0)
         else:
@@ -597,7 +687,7 @@ class FileProvider(Provider):
                 "budgeted_feedback": False
             },
             ProtocolConstants.DETECTION: {
-                "function": get_detection_feedback,
+                "function": get_single_gt_feedback,
                 "files": [ProtocolConstants.DETECTION],
                 "columns": [0],
                 "detection_req": ProtocolConstants.SKIP,
@@ -660,6 +750,24 @@ class FileProvider(Provider):
                 "budgeted_feedback": True,
                 "required_hints": [],
                 "alternate_budget": "max_detection_feedback_ids"
+            }
+        },
+        "nlt": {
+            ProtocolConstants.SCORE: {
+                "function": nlt_score_feedback,
+                "files": [ProtocolConstants.LABELS],
+                "columns": [1, 2],
+                "detection_req": ProtocolConstants.IGNORE,
+                "budgeted_feedback": True,
+                "include_test_info": True
+            },
+            ProtocolConstants.LABELS: {
+                "function": nlt_labels_feedback,
+                "files": [],
+                "columns": [2],
+                "detection_req": ProtocolConstants.IGNORE,
+                "budgeted_feedback": False,
+                "include_test_info": True
             }
         }
     }
@@ -792,6 +900,12 @@ class FileProvider(Provider):
 
         # Add columns to metadata for use in feedback
         metadata["columns"] = feedback_definition.get("columns", [])
+        metadata["domain"] = domain
+
+        if feedback_definition.get("include_test_info", False):
+            metadata["folder"] = self.results_folder
+            metadata["session_id"] = session_id
+            metadata["test_id"] = test_id
 
         # Get feedback from specified test
         try:
@@ -922,7 +1036,7 @@ class FileProvider(Provider):
         protocol = structure["created"]["protocol"]
         domain = structure["created"]["domain"]
         ground_truth_file = os.path.join(self.folder, protocol, domain, f"{test_id}_single_df.csv")
-        gt = pd.read_csv(ground_truth_file, sep=",", header=None, skiprows=1,encoding='utf-8')
+        gt = pd.read_csv(ground_truth_file, sep=",", header=None, skiprows=1,encoding=get_encoding(domain))
         results = {}
         metadata = self.get_test_metadata(session_id, test_id, False, in_process_only=False)
 

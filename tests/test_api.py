@@ -375,7 +375,7 @@ class TestApi(unittest.TestCase):
 
         _check_response(response)
 
-        expected = "abcde.mp4,1,2,3,4,5\nfghij.mp4,6,7,8,9,10\n"
+        expected = "abcde.mp4,0\nfghij.mp4,11\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
@@ -669,3 +669,79 @@ class TestApi(unittest.TestCase):
         )
 
         _check_response(response)
+
+
+    def test_nlt_data_request_success(self):
+        """Test dataset request for nlt."""
+        response = get(
+            "/session/dataset",
+            params={"session_id": "data_request_nlt", "test_id": "OND.1.1.1234", "round_id": 0},
+        )
+
+        _check_response(response)
+        expected = "0,1,|this is great|,5,2\n1,0,|this is bad|,1,4\n2,0,|this is alright|,3,1\n3,1,|this is meh|,2,6\n"
+        actual = response.content.decode("utf-16")
+        self.assertEqual(expected, actual)
+
+
+    def test_get_feedback_nlt_score_success(self):
+        """Test get_feedback success with type score for nlt domain."""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": ProtocolConstants.SCORE,
+                "session_id": "get_feedback_nlt_score_success",
+                "test_id": "OND.1.1.1234",
+                "round_id": 0,
+            },
+        )
+
+        _check_response(response)
+        expected = "current_score,8\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
+
+    def test_get_feedback_nlt_score_failure(self):
+        """Test get_feedback failure with type score for nlt domain."""
+        
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": ProtocolConstants.SCORE,
+                "session_id": "get_feedback_nlt_score_failure",
+                "test_id": "OND.1.1.1234",
+                "round_id": 0,
+            },
+        )
+
+        try:
+            _check_response(response)
+        except errors.ApiError as e:
+            self.assertEqual("InvalidTuple", e.reason)
+            return
+        
+        self.assertFalse(True, "failed")
+
+
+    def test_get_feedback_nlt_label_success(self):
+        """Test get_feedback success with type labels for nlt domain."""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": ProtocolConstants.LABELS,
+                "feedback_ids": "|".join(["0", "1", "2"]),
+                "session_id": "get_feedback_nlt_labels_success",
+                "test_id": "OND.1.1.1234",
+                "round_id": 0,
+            },
+        )
+
+        _check_response(response)
+        expected = "0,1\n1,0\n2,1\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
+
+    # def test_get_feedback_nlt_label_failure(self):
+    #     _check_response(response)

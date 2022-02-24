@@ -15,3 +15,9 @@ class ProtocolConstants:
     NOTIFY_AND_CONTINUE = "NOTIFY_AND_CONTINUE"
     IGNORE = "IGNORE"
     SKIP = "SKIP"
+
+    # Domain specific encoding
+    NLT_ENCODING = "utf-16"
+    VAR_ENCODING = "utf-8"
+    WTR_ENCODING = "utf-8"
+

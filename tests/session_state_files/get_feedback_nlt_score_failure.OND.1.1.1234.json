@@ -1,0 +1,34 @@
+{
+    "data_request": {
+      "time": [
+        "2020-12-22 17:05:51.766643"
+      ],
+      "rounds": {
+        "0": {
+          "time": [
+            "2020-12-22 17:05:51.766643"
+          ]
+        },
+        "1": {
+          "time": [
+            "2020-12-22 17:05:55.836594"
+          ]
+        }
+      },
+      "last round": "1"
+    },
+    "post_results": {
+      "time": [
+        "2020-10-20 11:37:24.499321"
+      ],
+      "labels file path": "tests/server_results_unit_tests/OND/nlt/get_feedback_nlt_score_success.OND.1.1.1234_labels.csv",
+      "last round": "0",
+      "rounds": {
+        "0": {
+          "time": [
+            "2020-09-25 11:05:23.986603"
+          ]
+        }
+      }
+    }
+  }
