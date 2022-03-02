@@ -215,9 +215,9 @@ def get_classification_feedback_topk(
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
     
     topk = read_feedback_file(read_gt_csv_file(topk_file, with_header=True), None, metadata,
-                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)  
+                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)
     return {
-        x: topk[int(ground_truth[x][metadata["columns"][0] - 1])] 
+        x: topk[str(ground_truth[x][metadata["columns"][0] - 1])] 
         for x in ground_truth.keys()
     }
 
