@@ -399,6 +399,24 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
+    def test_budget_get_feedback(self):
+        """Test get_feedback for var with type detection."""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": ProtocolConstants.DETECTION,
+                "session_id": "get_feedback_budget",
+                "test_id": "OND.1.1.1235",
+                "round_id": 0,
+            },
+        )
+
+        _check_response(response)
+
+        expected = "abcde.mp4,0\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
     def noused_test_get_feedback_psuedo_classification(self):
         """Test getting psuedo labels for given ids"""
         response = get(
