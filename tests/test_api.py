@@ -366,7 +366,7 @@ class TestApi(unittest.TestCase):
             params={
                 "feedback_ids": "|".join(
                     ["abcde.mp4", "fghij.mp4"]),
-                "feedback_type": ProtocolConstants.CLASSIFICATION,
+                "feedback_type": ProtocolConstants.LABELS,
                 "session_id": "get_feedback_var",
                 "test_id": "OND.1.1.1234",
                 "round_id": 0,
@@ -742,6 +742,3 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
-
-    # def test_get_feedback_nlt_label_failure(self):
-    #     _check_response(response)
