@@ -761,9 +761,19 @@ class FileProvider(Provider):
                 "budgeted_feedback": True,
                 "include_test_info": True
             },
+            ProtocolConstants.DETECTION: {
+                "function": get_single_gt_feedback,
+                "files": [ProtocolConstants.DETECTION],
+                "columns": [0],
+                "detection_req": ProtocolConstants.IGNORE,
+                "budgeted_feedback": True,
+                "required_hints": [],
+                "alternate_budget": "max_detection_feedback_ids",
+                "return_incorrect": ProtocolConstants.DETECTION
+            },
             ProtocolConstants.LABELS: {
                 "function": nlt_labels_feedback,
-                "files": [],
+                "files": [ProtocolConstants.LABELS],
                 "columns": [2],
                 "detection_req": ProtocolConstants.IGNORE,
                 "budgeted_feedback": False,
