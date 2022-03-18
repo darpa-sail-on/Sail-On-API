@@ -227,19 +227,37 @@ def get_single_gt_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Grabs and returns specified column"""
+    with open(result_files[0], "r") as rf:
+        result_reader = csv.reader(rf, delimiter=",")
+        results = read_feedback_file(result_reader, feedback_ids, metadata, check_constrained=True)
+
+    # if feedback ids not provided, limit to those in the last round
     if (feedback_ids is None or len(feedback_ids) == 0):
-        # if feedback ids not provided, limit to those in the last round
-        with open(result_files[0], "r") as rf:
-            result_reader = csv.reader(rf, delimiter=",")
-            results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
-            feedback_ids = list(results.keys())
+        feedback_ids = list(results.keys())
 
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
+    return_ids = []
+    # For specified feedback types, will only return feedback on instances marked incorrectly
+    if metadata.get("return_incorrect", None):
+        for id in results.keys():
+            r = -1
+            if metadata["return_incorrect"] == ProtocolConstants.CLASSIFICATION:
+                r = int(np.argmax([float(i) for i in results[id]], axis=0))
+            elif metadata["return_incorrect"] == ProtocolConstants.DETECTION:
+                r = int(results[id][0])
+            else:
+                raise ProtocolError("FeedbackConfigError", "The api based feedback config is misconfigured. Please check API")
+            g = int(ground_truth[id][metadata["columns"][0]])
+            if r != g:
+                return_ids.append(id)
+    else:
+        return_ids = ground_truth.keys()
+
     return {
         x: ground_truth[x][metadata["columns"][0]]
-        for x in ground_truth.keys()
+        for x in return_ids
     }
 
 def get_classificaton_score_feedback(
@@ -450,9 +468,28 @@ def nlt_labels_feedback(
 ) -> Dict[str, Any]:
     "Returns the real writer id labels for specified instance ids in the nlt domain"
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata)
+
+    with open(result_files[0], "r") as rf:
+        result_reader = csv.reader(rf, delimiter=",")
+        results = read_feedback_file(result_reader, feedback_ids, metadata, check_constrained=True)
+
+    # if feedback ids not provided, limit to those in the last round
+    if (feedback_ids is None or len(feedback_ids) == 0):
+        feedback_ids = list(results.keys())
+
+    return_ids = []
+    # For specified feedback types, will only return feedback on instances marked incorrectly
+    if metadata.get("return_incorrect", None):
+        for id in results.keys():
+            r = int(results[id][1])
+            g = int(ground_truth[id][metadata["columns"][0]])
+            if r != g:
+                return_ids.append(id)
+    else:
+        return_ids = ground_truth.keys()
     
     return_dict = {
-        x: ground_truth[x][metadata["columns"][0]] for x in ground_truth.keys()
+        x: ground_truth[x][metadata["columns"][0]] for x in return_ids
     }
 
     # Subtract 1 from the current score in the session test log
@@ -721,19 +758,20 @@ class FileProvider(Provider):
         },
         "activity_recognition" : {
             #Discontinued kinetics label feedback
-            ProtocolConstants.LABELS:  {
+            ProtocolConstants.CLASSIFICATION:  {
                 "function": get_kinetics_labels_var_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [5, 10],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True
             },
-            ProtocolConstants.CLASSIFICATION:  {
+            ProtocolConstants.LABELS:  {
                 "function": get_single_gt_feedback,
                 "files": [ProtocolConstants.CLASSIFICATION],
                 "columns": [2],
                 "detection_req": ProtocolConstants.SKIP,
-                "budgeted_feedback": True
+                "budgeted_feedback": True,
+                "return_incorrect": ProtocolConstants.CLASSIFICATION
             },
             ProtocolConstants.SCORE: {
                 "function": get_classificaton_score_feedback,
@@ -749,7 +787,8 @@ class FileProvider(Provider):
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
                 "required_hints": [],
-                "alternate_budget": "max_detection_feedback_ids"
+                "alternate_budget": "max_detection_feedback_ids",
+                "return_incorrect": ProtocolConstants.DETECTION
             }
         },
         "nlt": {
@@ -777,7 +816,8 @@ class FileProvider(Provider):
                 "columns": [2],
                 "detection_req": ProtocolConstants.IGNORE,
                 "budgeted_feedback": False,
-                "include_test_info": True
+                "include_test_info": True,
+                "return_incorrect": True
             }
         }
     }
@@ -911,6 +951,7 @@ class FileProvider(Provider):
         # Add columns to metadata for use in feedback
         metadata["columns"] = feedback_definition.get("columns", [])
         metadata["domain"] = domain
+        metadata["return_incorrect"] = feedback_definition.get("return_incorrect", False)
 
         if feedback_definition.get("include_test_info", False):
             metadata["folder"] = self.results_folder

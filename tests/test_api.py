@@ -366,7 +366,7 @@ class TestApi(unittest.TestCase):
             params={
                 "feedback_ids": "|".join(
                     ["abcde.mp4", "fghij.mp4"]),
-                "feedback_type": ProtocolConstants.CLASSIFICATION,
+                "feedback_type": ProtocolConstants.LABELS,
                 "session_id": "get_feedback_var",
                 "test_id": "OND.1.1.1234",
                 "round_id": 0,
@@ -396,6 +396,24 @@ class TestApi(unittest.TestCase):
         _check_response(response)
 
         expected = "abcde.mp4,0\nfghij.mp4,1\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)
+
+    def test_budget_get_feedback(self):
+        """Test get_feedback for var with type detection."""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": ProtocolConstants.DETECTION,
+                "session_id": "get_feedback_budget",
+                "test_id": "OND.1.1.1235",
+                "round_id": 0,
+            },
+        )
+
+        _check_response(response)
+
+        expected = "abcde.mp4,0\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
@@ -742,6 +760,3 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
-
-    # def test_get_feedback_nlt_label_failure(self):
-    #     _check_response(response)
