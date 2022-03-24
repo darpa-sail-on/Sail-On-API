@@ -364,8 +364,7 @@ class TestApi(unittest.TestCase):
         response = get(
             "/session/feedback",
             params={
-                "feedback_ids": "|".join(
-                    ["abcde.mp4", "fghij.mp4"]),
+                #"feedback_ids": "|".join(["abcde.mp4", "fghij.mp4"]),
                 "feedback_type": ProtocolConstants.LABELS,
                 "session_id": "get_feedback_var",
                 "test_id": "OND.1.1.1234",
