@@ -803,7 +803,7 @@ class FileProvider(Provider):
             ProtocolConstants.DETECTION: {
                 "function": get_single_gt_feedback,
                 "files": [ProtocolConstants.DETECTION],
-                "columns": [0],
+                "columns": [1],
                 "detection_req": ProtocolConstants.IGNORE,
                 "budgeted_feedback": True,
                 "required_hints": [],
