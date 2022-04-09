@@ -5,6 +5,6 @@
   "pre-novelty-batches": 0,
   "round_size": 4,
   "threshold": 0.1,
-  "red_light": "3",
+  "red_light": 3,
   "feedback_max_ids": 4
 }

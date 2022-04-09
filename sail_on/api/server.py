@@ -320,10 +320,8 @@ def get_feedback() -> Response:
         test_id = data["test_id"]
         round_id =  data.get("round_id",'last')
         feedback_types = data["feedback_type"].split("|")
-        feedback_ids = data.get("feedback_ids", "")
-        if feedback_ids == "":
-            feedback_ids = None
-        else:
+        feedback_ids = data.get("feedback_ids", None)
+        if feedback_ids:
             feedback_ids = feedback_ids.split("|")
         logging.info(
             f"GetFeedback called with session_id: {session_id} test_id: {test_id} round_id: {round_id} feedback_ids: {feedback_ids} feedback_types: {feedback_types}"  # noqa: E501
