@@ -643,7 +643,7 @@ class TestApi(unittest.TestCase):
         response = get(
             "/test/metadata",
             params={
-                "session_id": "data_request",
+                "session_id": "data_request_nlt",
                 "test_id": "OND.1.1.1234"},
         )
 
@@ -741,7 +741,7 @@ class TestApi(unittest.TestCase):
         self.assertFalse(True, "failed")
 
 
-    def test_get_feedback_nlt_label_success(self):
+    def test_get_feedback_nlt_label_success_with_ids(self):
         """Test get_feedback success with type labels for nlt domain."""
         response = get(
             "/session/feedback",
@@ -759,3 +759,20 @@ class TestApi(unittest.TestCase):
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
 
+
+    def test_get_feedback_nlt_label_success_without_ids(self):
+        """Test get_feedback success with type labels for nlt domain."""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": ProtocolConstants.LABELS,
+                "session_id": "get_feedback_nlt_labels_success",
+                "test_id": "OND.1.1.1234",
+                "round_id": 0,
+            },
+        )
+
+        _check_response(response)
+        expected = "0,1\n1,0\n2,1\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)

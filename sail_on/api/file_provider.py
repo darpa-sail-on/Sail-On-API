@@ -169,7 +169,7 @@ def read_feedback_file(
             traceback.format_stack(),
         )
 
-    if feedback_ids is not None:
+    if feedback_ids:
         return {
             x[0]: [n for n in x[1:]]
             for x in [[n.strip(" \"'") for n in y] for y in lines][start:end]
@@ -231,22 +231,25 @@ def get_single_gt_feedback(
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata, check_constrained=True)
 
-    # if feedback ids not provided, limit to those in the last round
+    # if feedback ids not provided, limit ids grabbed from ground truth to the last submitted round
+    gt_feedback_ids = []
     if (feedback_ids is None or len(feedback_ids) == 0):
-        feedback_ids = list(results.keys())
+        gt_feedback_ids = list(results.keys())
+    else:
+        gt_feedback_ids = feedback_ids
 
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata,
-                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), gt_feedback_ids, metadata,
+                                      check_constrained= gt_feedback_ids is None or len(gt_feedback_ids) == 0)
 
     return_ids = []
-    # For specified feedback types, will only return feedback on instances marked incorrectly
-    if metadata.get("return_incorrect", None):
+    # For specific feedback types, and when no feedback ids are specified, will only return feedback on instances marked incorrectly
+    if metadata.get("return_incorrect", None) and not feedback_ids:
         for id in results.keys():
             r = -1
             if metadata["return_incorrect"] == ProtocolConstants.CLASSIFICATION:
                 r = int(np.argmax([float(i) for i in results[id]], axis=0))
             elif metadata["return_incorrect"] == ProtocolConstants.DETECTION:
-                r = int(results[id][0])
+                r = int(results[id][1])
             else:
                 raise ProtocolError("FeedbackConfigError", "The api based feedback config is misconfigured. Please check API")
             g = int(ground_truth[id][metadata["columns"][0]])
@@ -467,19 +470,24 @@ def nlt_labels_feedback(
     metadata: Dict[str, Any]
 ) -> Dict[str, Any]:
     "Returns the real writer id labels for specified instance ids in the nlt domain"
-    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), feedback_ids, metadata)
 
     with open(result_files[0], "r") as rf:
         result_reader = csv.reader(rf, delimiter=",")
         results = read_feedback_file(result_reader, feedback_ids, metadata, check_constrained=True)
 
-    # if feedback ids not provided, limit to those in the last round
+    # if feedback ids not provided, limit ids grabbed from ground truth to the last submitted round
+    gt_feedback_ids = []
     if (feedback_ids is None or len(feedback_ids) == 0):
-        feedback_ids = list(results.keys())
+        gt_feedback_ids = list(results.keys())
+    else:
+        gt_feedback_ids = feedback_ids
+
+    ground_truth = read_feedback_file(read_gt_csv_file(gt_file, metadata["domain"]), gt_feedback_ids, metadata,
+                                            check_constrained= gt_feedback_ids is None or len(gt_feedback_ids) == 0)
 
     return_ids = []
     # For specified feedback types, will only return feedback on instances marked incorrectly
-    if metadata.get("return_incorrect", None):
+    if metadata.get("return_incorrect", None) and not feedback_ids:
         for id in results.keys():
             r = int(results[id][1])
             g = int(ground_truth[id][metadata["columns"][0]])
@@ -495,9 +503,9 @@ def nlt_labels_feedback(
     # Subtract 1 from the current score in the session test log
     test_structure = get_session_test_info(metadata["folder"], metadata["session_id"], metadata["test_id"])
     if "current_score" in test_structure:
-        test_structure["current_score"]["score"] -= len(feedback_ids)
+        test_structure["current_score"]["score"] -= len(return_ids)
     else:
-        test_structure["current_score"] = {"score": (-1 * len(feedback_ids))}
+        test_structure["current_score"] = {"score": (-1 * len(return_ids))}
     
     write_session_log_file(test_structure, os.path.join(
         metadata["folder"], 
