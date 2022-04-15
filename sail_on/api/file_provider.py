@@ -218,7 +218,7 @@ def get_classification_feedback_topk(
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)   
     
     data = {
-        x: topk[str(int(eval(ground_truth[x][metadata["columns"][0] - 1])))] 
+        x: topk[str(int(float(ground_truth[x][metadata["columns"][0] - 1])))] 
         for x in ground_truth.keys()
     }
     return data
