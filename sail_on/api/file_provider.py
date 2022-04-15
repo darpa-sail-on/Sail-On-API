@@ -215,11 +215,13 @@ def get_classification_feedback_topk(
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
     
     topk = read_feedback_file(read_gt_csv_file(topk_file, with_header=True), None, metadata,
-                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)
-    return {
-        x: topk[str(ground_truth[x][metadata["columns"][0] - 1])] 
+                                      check_constrained= feedback_ids is None or len(feedback_ids) == 0)   
+    
+    data = {
+        x: topk[str(int(float(ground_truth[x][metadata["columns"][0] - 1])))] 
         for x in ground_truth.keys()
     }
+    return data
 
 
 def get_classification_var_feedback(
@@ -241,9 +243,23 @@ def get_detection_feedback(
     gt_file: str,
     result_files: List[str],
     feedback_ids: List[str],
-    metadata: Dict[str, Any]
+    metadata: Dict[str, Any],
+    is_given_detection_mode: bool,
 ) -> Dict[str, Any]:
     """Grabs and returns"""
+    if (feedback_ids is None or len(feedback_ids) == 0):
+        # if feedback ids not provided, limit to those in the last round
+        with open(result_files[0], "r") as rf:
+            result_reader = csv.reader(rf, delimiter=",")
+            results = read_feedback_file(result_reader, None, metadata, check_constrained=True)
+            # if empty feedback ids requested for system detection use budget
+            if not is_given_detection_mode:
+                feedback_max_ids = min(metadata.get('max_detection_feedback_ids',len(results)),len(results))
+                feedback_ids = list(results.keys())[:int(feedback_max_ids)]
+            else:
+                # No budget for given detection
+                feedback_ids = list(results.keys())
+
     ground_truth = read_feedback_file(read_gt_csv_file(gt_file), feedback_ids, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)
 
@@ -1459,7 +1475,8 @@ class FileProviderSVO(FileProvider):
                     ground_truth_file,
                     results_files,
                     feedback_ids,
-                    metadata
+                    metadata,
+                    is_given_detection_mode
                 )
         except KeyError as e:
             raise ProtocolError(
