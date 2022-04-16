@@ -1,4 +1,4 @@
-flask>=1.1.2
+flask>=1.1.2,<2.0
 importlib-metadata>=1.6.0
 requests>=2.23.0
 requests_toolbelt>=0.9.1
