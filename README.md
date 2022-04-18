@@ -5,7 +5,7 @@ PAR's TA1 API
 
 Insure python3 is accessible and pipenv is ibtalled.
 
-1. From the sail-on-api' directory, run 'pipenv --python 3.7'
+1. From the sail-on-api' directory, run 'pipenv --python 3.8'
 2. Run 'pipenv install'
 2. Run 'pipenv shell'
 3. Run 'python setup.py install'
