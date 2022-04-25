@@ -877,7 +877,7 @@ class FileProvider(Provider):
             # determines whether the limit has already been reached
             feedback_round_id = str(max([int(r) for r in test_structure["post_results"]["rounds"].keys()]))
 
-            feedback_count = test_structure["get_feedback"]["rounds"][feedback_round_id].get(feedback_type, 0)
+            feedback_count = test_structure["get_feedback"]["rounds"].get(feedback_round_id,{}).get(feedback_type, 0)
             if feedback_count >= feedback_budget:
                 raise ProtocolError(
                     "FeedbackBudgetExceeded",
