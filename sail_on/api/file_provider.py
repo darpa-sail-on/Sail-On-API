@@ -804,7 +804,7 @@ class FileProvider(Provider):
                 "function": nlt_score_feedback,
                 "files": [ProtocolConstants.LABELS],
                 "columns": [1, 2],
-                "detection_req": ProtocolConstants.IGNORE,
+                "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
                 "include_test_info": True
             },
@@ -812,7 +812,7 @@ class FileProvider(Provider):
                 "function": get_single_gt_feedback,
                 "files": [ProtocolConstants.DETECTION],
                 "columns": [1],
-                "detection_req": ProtocolConstants.IGNORE,
+                "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
                 "required_hints": [],
                 "alternate_budget": "max_detection_feedback_ids",
@@ -822,7 +822,7 @@ class FileProvider(Provider):
                 "function": nlt_labels_feedback,
                 "files": [ProtocolConstants.LABELS],
                 "columns": [2],
-                "detection_req": ProtocolConstants.IGNORE,
+                "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": False,
                 "include_test_info": True,
                 "return_incorrect": True
