@@ -776,3 +776,21 @@ class TestApi(unittest.TestCase):
         expected = "0,1\n1,0\n2,1\n"
         actual = response.content.decode("utf-8")
         self.assertEqual(expected, actual)
+
+    def test_get_feedback_nlt_detection_success_with_ids(self):
+        """Test get_feedback success with type labels for nlt domain."""
+        response = get(
+            "/session/feedback",
+            params={
+                "feedback_type": ProtocolConstants.DETECTION,
+                "feedback_ids": "|".join(["0", "1", "2"]),
+                "session_id": "get_feedback_nlt_labels_success",
+                "test_id": "OND.1.1.1234",
+                "round_id": 0,
+            },
+        )
+
+        _check_response(response)
+        expected = "0,0\n1,0\n2,1\n"
+        actual = response.content.decode("utf-8")
+        self.assertEqual(expected, actual)

@@ -249,7 +249,7 @@ def get_single_gt_feedback(
             if metadata["return_incorrect"] == ProtocolConstants.CLASSIFICATION:
                 r = int(np.argmax([float(i) for i in results[id]], axis=0))
             elif metadata["return_incorrect"] == ProtocolConstants.DETECTION:
-                r = int(results[id][1])
+                r = 1 if (float(results[id][1]) > metadata.get("detection_threshold", 0.5)) else 0
             else:
                 raise ProtocolError("FeedbackConfigError", "The api based feedback config is misconfigured. Please check API")
             g = int(ground_truth[id][metadata["columns"][0]])
