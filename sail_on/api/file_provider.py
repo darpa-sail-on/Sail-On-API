@@ -811,7 +811,7 @@ class FileProvider(Provider):
             ProtocolConstants.DETECTION: {
                 "function": get_single_gt_feedback,
                 "files": [ProtocolConstants.DETECTION],
-                "columns": [1],
+                "columns": [6],
                 "detection_req": ProtocolConstants.SKIP,
                 "budgeted_feedback": True,
                 "required_hints": [],
