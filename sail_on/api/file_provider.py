@@ -570,9 +570,9 @@ class FileProvider(Provider):
         md = read_meta_data(metadata_location, info["domain"])
         md.update(overrides)
         if api_call:
-                return {
-                    k: v for k, v in md.items() if k in approved_metadata
-                }
+            return {
+                k: v for k, v in md.items() if k in approved_metadata
+            }
         return md
 
     def test_ids_request(
@@ -1006,7 +1006,7 @@ class FileProvider(Provider):
             activity="get_feedback",
             test_id=test_id,
             round_id=feedback_round_id,
-            content={feedback_type: feedback_count, feedback_budget: feedback_budget},
+            content={feedback_type: feedback_count, "feedback_budget": feedback_budget},
         )
 
         feedback_csv = BytesIO()
