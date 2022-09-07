@@ -5,7 +5,7 @@ PAR's TA1 API
 
 Insure python3 is accessible and pipenv is ibtalled.
 
-1. From the sail-on-api' directory, run 'pipenv --python 3.7'
+1. From the sail-on-api' directory, run 'pipenv --python 3.8'
 2. Run 'pipenv install'
 2. Run 'pipenv shell'
 3. Run 'python setup.py install'
@@ -15,7 +15,7 @@ All other commands should be run within the pipenv shell or pipenv envronment.
 ### Running the sail-on api
 
 To run the API locally, use the following command:
-   `sail_on_server --url 192.168.34.9:8102 --data-directory ./tests/data --results-directory ./test/results/dryrun/tmptmp/`
+   `sail_on_server --url 192.168.34.9:8102 --data-directory <path-to-your-test-data> --results-directory ./test/results/dryrun/tmptmp/`
 
 To use a different port you can add the following optional paramater:
    `--url localhost:12345`
