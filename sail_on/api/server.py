@@ -370,6 +370,65 @@ def get_feedback() -> Response:
         raise ServerError(str(type(e)), str(e), traceback.format_exc())
 
 
+@app.route("/session/hint", methods=["GET"])
+def get_hint() -> Response:
+    """
+    Gets Feedback of the specified type from the server provided one or more label ids
+    Arguments:
+        -session_id
+        -test_id
+        -round_id: Not required for typeA
+        -hint_type: typeA, typeB
+    Returns:
+        -hint csv file(s)
+    """
+
+    # Attempts to retrieve the proper variables from the API call body,
+    # and passes them to the provider function
+    data = request.args
+    try:
+        session_id = data["session_id"]
+        test_id = data["test_id"]
+        round_id = data.get("round_id", -1)
+        hint_type = data["hint_type"]
+        
+        logging.info(
+            f"GetHint called with session_id: {session_id} test_id: {test_id} round_id {round_id} hint_type: {hint_type}"  # noqa: E501
+        )
+    except KeyError:
+        raise ProtocolError(
+            "MissingParamsError",
+            "GetHint requires hint type(s), session_id, and test_id",
+            traceback.format_exc(),
+        )
+    
+    if round_id == -1 and hint_type == 'typeB':
+        raise ProtocolError(
+            "MissingParamsError",
+            "GetHint requires round_id with 'Type B' hint type",
+            traceback.format_exc(),
+        )
+
+    try:
+        responses = {}
+        responses[hint_type] = Binder.provider.get_hint(session_id, test_id, round_id, hint_type)
+    except RoundError as e:
+        raise e
+    except ServerError as e:
+        raise e
+    except ProtocolError as e:
+        raise e
+    except Exception as e:
+        raise ServerError(str(type(e)), str(e), traceback.format_exc())
+
+    # returns the file(s)
+    try:
+        logging.info(f"Returning hint at file(s)")
+        return send_file(responses[hint_type], attachment_filename=f'{session_id}.{test_id}.{round_id}_{hint_type}.csv', mimetype="test/csv")
+    except Exception as e:
+        raise ServerError(str(type(e)), str(e), traceback.format_exc())
+
+
 @app.route("/session/results", methods=["POST"])
 def post_results() -> str:
     """
