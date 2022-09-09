@@ -217,6 +217,9 @@ def get_classification_feedback_topk(
     topk = read_feedback_file(read_gt_csv_file(topk_file, with_header=True), None, metadata,
                                       check_constrained= feedback_ids is None or len(feedback_ids) == 0)   
     
+    '''
+    
+    '''
     data = {
         x: topk[str(int(float(ground_truth[x][metadata["columns"][0] - 1])))] 
         for x in ground_truth.keys()
@@ -423,6 +426,36 @@ def psuedo_label_feedback(
     return return_dict
 
 # endregion
+
+def get_hint_typeA(
+        gt_file: str,
+        metadata: Dict[str, Any],
+        hint_file
+) -> Dict[str, Any]:
+    df = pd.read_csv(hint_file)
+    hint = df[df['test_id'] == metadata['curr_test_id']]['novelty_kind'][0]
+    return {metadata['curr_test_id'] : hint}
+
+def get_hint_typeB(
+        gt_file: str,
+        metadata: Dict[str, Any],
+        hint_file
+) -> Dict[str, Any]:
+    df = pd.read_csv(gt_file)
+    try:
+            round_pos = int(metadata["curr_round_id"]) * int(metadata["round_size"])
+    except KeyError:
+            raise RoundError(
+                "no_defined_rounds",
+                f"round_size not defined in metadata for test id {test_id}",
+                traceback.format_stack(),
+            )
+    if round_pos >= len(df):
+        return {}
+
+    df = df[round_pos:round_pos + int(metadata["round_size"])]
+    
+    return {k:v for k,v in zip(df["new_image_path"].tolist(), df["novel"].tolist())}
 
 
 class FileProvider(Provider):
@@ -1241,7 +1274,22 @@ class FileProviderSVO(FileProvider):
                                         }
                                     }
                                 }
-    
+
+    hint_request_mapping = { "svo_classification" : 
+                                {
+                                    ProtocolConstants.TYPE_A:  {
+                                        "function": get_hint_typeA,
+                                        "files": [ProtocolConstants.TYPE_A],
+                                        "columns": [1] # HARDCODE
+                                    },
+                                    ProtocolConstants.TYPE_B: {
+                                        "function": get_hint_typeB,
+                                        "files": [ProtocolConstants.TYPE_A],
+                                        "columns": [-1], # HARDCODE
+                                    }
+                                }
+                            }
+
     def dataset_request(self, session_id: str, test_id: str, round_id: int) -> FileResult:
         """Request a dataset."""
         try:
@@ -1517,3 +1565,110 @@ class FileProviderSVO(FileProvider):
         feedback_csv.seek(0)
 
         return feedback_csv
+    
+    def get_hint(
+        self,
+        session_id: str,
+        test_id: str,
+        round_id: str,
+        hint_type: str
+    ) -> BytesIO:
+        """Get Hint of the specified type"""
+
+        metadata = self.get_test_metadata(session_id, test_id, False)
+        structure = get_session_info(self.results_folder, session_id)
+        test_structure = get_session_test_info(self.results_folder, session_id, test_id)
+        domain = structure["created"]["domain"]
+        if domain not in self.hint_request_mapping:
+            raise ProtocolError(
+                "BadDomain",
+                f"The set domain does not match a proper domain type. Please check the metadata file for test {test_id}",
+                traceback.format_stack(),
+            )
+
+
+        try:
+                hint_definition = self.hint_request_mapping[domain][hint_type]
+                file_types = hint_definition["files"]
+        except:
+                raise ProtocolError(
+                    "InvalidFeedbackType",
+                    f"Invalid feedback type requested for the test id {test_id} with domain {domain}",
+                    traceback.format_stack(),
+                )
+        
+        # if hints is 'red_light' means it is given detection mode
+        is_given_detection_mode = 'red_light' in structure["created"].get('hints', [])
+
+        ground_truth_file = os.path.join(self.folder, metadata["protocol"], domain, f"{test_id}_single_df.csv")
+
+        if not os.path.exists(ground_truth_file):
+            raise ServerError(
+                    "test_id_invalid",
+                    f"Could not find ground truth file for test Id {test_id}",
+                    traceback.format_stack(),
+                )
+
+        # results_files = []
+        # for t in file_types:
+        #         results_files.append(os.path.join(self.results_folder,metadata["protocol"], domain,f"{str(session_id)}.{str(test_id)}_{t}.csv"))
+
+        # if len(results_files) < len(file_types):
+        #         raise ServerError(
+        #             "test_id_invalid",
+        #             f"Could not find posted result file(s) for test Id {test_id} with feedback type {feedback_type}",
+        #             traceback.format_stack(),
+        #         )
+
+        # Add columns to metadata for use in feedback
+        metadata["columns"] = hint_definition.get("columns", [])
+        metadata["curr_test_id"] = test_id
+        metadata["curr_round_id"] = round_id
+
+        hint_file = os.path.join(self.folder, metadata["protocol"], domain, f"hints_info.csv")
+
+        if not os.path.isfile(hint_file):
+            raise ServerError(
+                    "Hint file invalid",
+                    "Could not find ground truth file for ",
+                    traceback.format_stack(),
+                )
+
+        if not is_given_detection_mode and hint_type == ProtocolConstants.TYPE_B:
+            raise ServerError(
+                    "Invalid Hint type",
+                    "Type B hint not supported by system detection",
+                    traceback.format_stack(),
+                )
+        try:
+            hint = hint_definition["function"](
+                ground_truth_file,
+                metadata,
+                hint_file,
+            )
+        except KeyError as e:
+            raise ProtocolError(
+                "Hint_type_invalid",
+                f"Hint type {hint_type} is not valid. Make sure the provider's hint_algorithms variable is properly set up",
+                traceback.format_exc()
+            )
+
+
+        log_session(
+            self.results_folder,
+            session_id=session_id,
+            activity="get_hint",
+            test_id=test_id,
+            round_id=round_id,
+        )
+
+        hint_csv = BytesIO()
+        for key in hint.keys():
+            if type(hint[key]) is not list:
+                hint_csv.write(f"{key},{hint[key]}\n".encode('utf-8'))
+            else:
+                hint_csv.write(f"{key},{','.join(str(x) for x in hint[key])}\n".encode('utf-8'))
+
+        hint_csv.seek(0)
+
+        return hint_csv

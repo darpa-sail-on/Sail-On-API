@@ -14,3 +14,7 @@ class ProtocolConstants:
     NOTIFY_AND_CONTINUE = "NOTIFY_AND_CONTINUE"
     IGNORE = "IGNORE"
     SKIP = "SKIP"
+
+    # Hint types
+    TYPE_A = "typeA"
+    TYPE_B = "typeB"
