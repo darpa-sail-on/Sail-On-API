@@ -60,6 +60,9 @@ The file structure for test data is:
 + + + TEST DATA FILE: <PROTOCOL>.<TEST>.<NO>.<SEED>.csv files contain the list of examples by URI or filename
 + + + TEST LABEL FILE:<PROTOCOL>.<TEST>.<NO>.<SEED>_<GTTYPE>.csv files contain the list of examples by URI or filename along the ground truth labels for the specific type of ground truth.  There may be more than one type (e.g. classification, characterization).
 
+### Configure Hints for UMD_SVO
+Hint Type B : No changes needed. Once can request for Type B hint for given dtection only.
+Hint Type A : Create a csv file with two columns : ['test_id' , 'novelty_kind']. Server will read this csv and will return the corresponding hint for the test_id. Name the csv file "hints_info.csv" and put that file in the same location as your test_files ( {path}/OND/svo_classification/hints_info.csv )
 
 ## KEY COMPONENTS
 
