@@ -220,10 +220,16 @@ def get_classification_feedback_topk(
     '''
     
     '''
-    data = {
-        x: topk[str(int(float(ground_truth[x][metadata["columns"][0] - 1])))] 
-        for x in ground_truth.keys()
-    }
+    try:
+        data = {
+            x: topk[str(int(float(ground_truth[x][metadata["columns"][0] - 1])))] 
+            for x in ground_truth.keys()
+        }
+    except Exception as e:
+        print("Topk : ", topk)
+        print("GT : ", ground_truth)
+        print(e.trace())
+        # import pdb;pdb.set_trace()
     return data
 
 
@@ -433,7 +439,7 @@ def get_hint_typeA(
         hint_file
 ) -> Dict[str, Any]:
     df = pd.read_csv(hint_file)
-    hint = df[df['test_id'] == metadata['curr_test_id']]['novelty_kind'][0]
+    hint = df[df['test_id'] == metadata['curr_test_id']]['novelty_kind'].iloc[0]
     return {metadata['curr_test_id'] : hint}
 
 def get_hint_typeB(
@@ -499,8 +505,8 @@ class FileProvider(Provider):
         hints = info.get('hints',[])
 
         approved_metadata.extend([data for data in ["red_light"] if data in hints])
-
         md = read_meta_data(metadata_location)
+
         if api_call:
                 return {
                     k: v for k, v in md.items() if k in approved_metadata
@@ -1586,6 +1592,7 @@ class FileProviderSVO(FileProvider):
                 traceback.format_stack(),
             )
 
+        # import pdb;pdb.set_trace()
 
         try:
                 hint_definition = self.hint_request_mapping[domain][hint_type]
